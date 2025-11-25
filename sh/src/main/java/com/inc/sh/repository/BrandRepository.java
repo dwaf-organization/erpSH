@@ -1,0 +1,29 @@
+package com.inc.sh.repository;
+import com.inc.sh.entity.BrandInfo;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface BrandRepository extends JpaRepository<BrandInfo, Integer> {
+    
+    // 브랜드코드로 조회
+    BrandInfo findByBrandCode(Integer brandCode);
+    
+    // 본사코드로 전체 조회
+    List<BrandInfo> findByHqCode(Integer hqCode);
+    
+    // 본사코드와 브랜드코드로 조회
+    Optional<BrandInfo> findByHqCodeAndBrandCode(Integer hqCode, Integer brandCode);
+    
+    // 브랜드 사용 여부 확인 (customer 테이블에서 참조 확인)
+    @Query(value = "SELECT COUNT(*) FROM customer WHERE brand_code = :brandCode", nativeQuery = true)
+    Long countCustomersByBrandCode(@Param("brandCode") Integer brandCode);
+    
+    // 브랜드 사용 여부 확인 (order_limit_set 테이블에서 참조 확인)
+    @Query(value = "SELECT COUNT(*) FROM order_limit_set WHERE brand_code = :brandCode", nativeQuery = true)
+    Long countOrderLimitSetByBrandCode(@Param("brandCode") Integer brandCode);
+}
