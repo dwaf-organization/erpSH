@@ -37,12 +37,10 @@ public class SettingController {
      * GET /api/v1/erp/setting/order-config
      */
 	@GetMapping("/order-config")
-	public ResponseEntity<RespDto<OrderConfigRespDto>> getOrderConfig( // 메서드명 변경 (관례)
+	public ResponseEntity<RespDto<OrderConfigRespDto>> getOrderConfig(
     		@RequestParam("hq_code") Integer hqCode) {
         
-        // Service에서 이미 RespDto<OrderConfigRespDto> 형태로 변환하여 반환하므로 그대로 사용
         RespDto<OrderConfigRespDto> response = settingService.getOrderConfigByHqCode(hqCode);
-        
         return ResponseEntity.ok(response);
     }
 	
@@ -54,11 +52,7 @@ public class SettingController {
     public ResponseEntity<RespDto<OrderConfigRespDto>> updateOrderConfig(
             @RequestBody OrderConfigUpdateReqDto reqDto) {
         
-        // 1. 서비스 호출 및 업데이트된 DTO 반환
         RespDto<OrderConfigRespDto> updatedDto = settingService.updateOrderConfig(reqDto);
-
-        // 2. RespDto 포맷에 성공 메시지를 담아 반환
-        // HTTP 200 OK와 함께 RespDto.success 응답을 보냅니다.
         return ResponseEntity.ok(updatedDto);
     }
     
@@ -70,25 +64,21 @@ public class SettingController {
     public ResponseEntity<RespDto<List<OrderLimitRespDto>>> getOrderLimitList(
     		@RequestParam("brand_code") Integer brandCode) {
         
-        // 서비스 호출. 서비스에서 RespDto<List<OrderLimitRespDto>>를 반환합니다.
         RespDto<List<OrderLimitRespDto>> response = settingService.getOrderLimitListByBrandCode(brandCode);
-        
         return ResponseEntity.ok(response);
     }
     
     /**
-     * 주문 제한 설정 등록 및 수정
+     * 주문 제한 설정 등록 및 수정 (다중 저장)
      * POST /api/v1/erp/setting/order-limit/save
      */
     @PostMapping("/order-limit/save")
-    public ResponseEntity<RespDto<OrderLimitRespDto>> saveOrderLimit(
+    public ResponseEntity<RespDto<List<OrderLimitRespDto>>> saveOrderLimit(
             @RequestBody OrderLimitSaveReqDto reqDto) {
         
-        // 1. 서비스 호출 (등록 또는 수정)
-        OrderLimitRespDto resultDto = settingService.saveOrUpdateOrderLimit(reqDto);
-
-        // 2. RespDto 포맷에 성공 메시지를 담아 반환
-        return ResponseEntity.ok(RespDto.success("주문 제한 설정 저장 완료", resultDto));
+        // 다중 저장 서비스 호출
+        RespDto<List<OrderLimitRespDto>> response = settingService.saveOrUpdateOrderLimitMultiple(reqDto);
+        return ResponseEntity.ok(response);
     }
     
     /**
@@ -99,10 +89,7 @@ public class SettingController {
     public ResponseEntity<RespDto<Void>> deleteOrderLimit(
             @PathVariable("limit_code") Integer limitCode) {
         
-        // 1. 서비스 호출 및 삭제 실행. 서비스에서 이미 성공/실패 RespDto를 처리함.
         RespDto<Void> response = settingService.deleteOrderLimit(limitCode);
-
-        // 2. 서비스에서 반환된 RespDto를 그대로 ResponseEntity에 담아 반환
         return ResponseEntity.ok(response);
     }
 }

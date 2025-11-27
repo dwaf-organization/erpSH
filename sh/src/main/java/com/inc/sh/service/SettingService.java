@@ -1,5 +1,6 @@
 package com.inc.sh.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -19,9 +20,11 @@ import com.inc.sh.repository.HeadquarterRepository;
 import com.inc.sh.repository.OrderLimitSetRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SettingService {
 
 	private final HeadquarterRepository headquarterRepository;
@@ -33,17 +36,12 @@ public class SettingService {
     @Transactional(readOnly = true)
 	public RespDto<OrderConfigRespDto> getOrderConfigByHqCode(Integer hqCode) {
         
-        // 1. Repository를 통해 Headquarter Entity를 Optional로 조회
         Optional<Headquarter> headquarterOptional = headquarterRepository.findById(hqCode);
 
-        // 2. Optional을 확인하여 데이터 존재 여부에 따라 분기
         if (headquarterOptional.isEmpty()) {
-            // 데이터가 없을 경우: RespDto.fail() 반환
-            // 요청하신 code: -1, message: "없는 본사코드입니다.", data: null 응답이 생성됩니다.
             return RespDto.fail("존재하지않는 본사코드입니다.");
         }
         
-        // 3. 데이터가 있을 경우: 정상적인 DTO 변환 및 RespDto.success() 반환
         Headquarter headquarter = headquarterOptional.get();
 
         OrderConfigRespDto respDtoData = OrderConfigRespDto.builder()
@@ -57,12 +55,10 @@ public class SettingService {
     
     /**
      * 주문관리 설정 업데이트
-     * Headquarter Entity의 logistics_type, price_display_type 필드 업데이트
      */
     @Transactional
     public RespDto<OrderConfigRespDto> updateOrderConfig(OrderConfigUpdateReqDto reqDto) {
         
-        // 1. hqCode로 Headquarter Entity를 Optional로 조회
         Optional<Headquarter> headquarterOptional = headquarterRepository.findById(reqDto.getHqCode());
         
         if (headquarterOptional.isEmpty()) {
@@ -71,12 +67,9 @@ public class SettingService {
         
         Headquarter headquarter = headquarterOptional.get();
         
-        // 2. Entity 필드 업데이트
-        // Headquarter Entity의 Setter를 사용합니다.
         headquarter.setLogisticsType(reqDto.getLogisticsType());
         headquarter.setPriceDisplayType(reqDto.getPriceDisplayType());
 
-        // 3. 업데이트된 Entity 정보를 DTO로 변환하여 성공 응답에 담아 반환
         OrderConfigRespDto updatedDto = OrderConfigRespDto.builder()
                 .hqCode(headquarter.getHqCode())
                 .logisticsType(headquarter.getLogisticsType())
@@ -88,21 +81,16 @@ public class SettingService {
     
     /**
      * 주문 제한 설정 목록 조회
-     * @param brandCode 브랜드 코드
-     * @return 해당 브랜드의 요일별 주문 제한 설정 목록
      */
     @Transactional(readOnly = true)
     public RespDto<List<OrderLimitRespDto>> getOrderLimitListByBrandCode(Integer brandCode) {
         
-        // 1. Repository를 통해 OrderLimitSet Entity 목록 조회
         List<OrderLimitSet> entityList = orderLimitSetRepository.findByBrandCode(brandCode);
         
-        // 2. Entity 목록을 DTO 목록으로 변환
         List<OrderLimitRespDto> respDtoList = entityList.stream()
-                .map(OrderLimitRespDto::fromEntity) // DTO의 fromEntity 메서드 사용
+                .map(OrderLimitRespDto::fromEntity)
                 .collect(Collectors.toList());
         
-        // 3. 응답 처리 (데이터가 없을 경우 빈 리스트 반환)
         if (respDtoList.isEmpty()) {
             return RespDto.fail("해당 브랜드 코드(" + brandCode + ")에 설정된 주문 제한 정보가 없습니다.");
         }
@@ -111,48 +99,92 @@ public class SettingService {
     }
     
     /**
-     * 주문 제한 설정 등록 또는 수정 (limitCode 값으로 분기)
+     * 주문 제한 설정 등록 또는 수정 (기존 단일 저장 메서드 - 호환성 유지)
      */
     @Transactional
-    public OrderLimitRespDto saveOrUpdateOrderLimit(OrderLimitSaveReqDto reqDto) {
+    public OrderLimitRespDto saveOrUpdateOrderLimit(OrderLimitSaveReqDto.OrderLimitItemDto itemDto, 
+                                                     Integer brandCode, Integer hqCode) {
         
         OrderLimitSet savedEntity;
 
-        // 🚨 핵심 분기 로직 🚨
-        if (reqDto.getLimitCode() != null) {
-            // 1. UPDATE 로직: limitCode가 있을 경우
-            
-            // 1-1. 기존 Entity 조회 (없으면 예외 발생)
-            OrderLimitSet existingLimit = orderLimitSetRepository.findById(reqDto.getLimitCode())
-                    .orElseThrow(() -> new IllegalArgumentException("업데이트할 주문 제한 코드(" + reqDto.getLimitCode() + ")를 찾을 수 없습니다."));
+        if (itemDto.getLimitCode() != null) {
+            // UPDATE 로직
+            OrderLimitSet existingLimit = orderLimitSetRepository.findById(itemDto.getLimitCode())
+                    .orElseThrow(() -> new IllegalArgumentException("업데이트할 주문 제한 코드(" + itemDto.getLimitCode() + ")를 찾을 수 없습니다."));
 
-            // 1-2. 필드 업데이트
-            existingLimit.setBrandCode(reqDto.getBrandCode());
-            existingLimit.setHqCode(reqDto.getHqCode());
-            existingLimit.setDayName(reqDto.getDayName());
-            existingLimit.setLimitStartTime(reqDto.getLimitStartTime());
-            existingLimit.setLimitEndTime(reqDto.getLimitEndTime());
+            existingLimit.setBrandCode(brandCode);
+            existingLimit.setHqCode(hqCode);
+            existingLimit.setDayName(itemDto.getDayName());
+            existingLimit.setLimitStartTime(itemDto.getLimitStartTime());
+            existingLimit.setLimitEndTime(itemDto.getLimitEndTime());
             
             savedEntity = existingLimit;
             
         } else {
-            // 2. CREATE 로직: limitCode가 null일 경우
-            
-            // 2-1. DTO를 Entity로 변환
+            // CREATE 로직
             OrderLimitSet newLimit = OrderLimitSet.builder()
-                    .brandCode(reqDto.getBrandCode())
-                    .hqCode(reqDto.getHqCode())
-                    .dayName(reqDto.getDayName())
-                    .limitStartTime(reqDto.getLimitStartTime())
-                    .limitEndTime(reqDto.getLimitEndTime())
+                    .brandCode(brandCode)
+                    .hqCode(hqCode)
+                    .dayName(itemDto.getDayName())
+                    .limitStartTime(itemDto.getLimitStartTime())
+                    .limitEndTime(itemDto.getLimitEndTime())
                     .build();
             
-            // 2-2. 저장
             savedEntity = orderLimitSetRepository.save(newLimit);
         }
 
-        // 3. 저장/업데이트된 Entity를 응답 DTO로 변환
         return OrderLimitRespDto.fromEntity(savedEntity);
+    }
+    
+    /**
+     * 주문 제한 설정 다중 등록/수정 (새로 추가된 메서드)
+     */
+    @Transactional
+    public RespDto<List<OrderLimitRespDto>> saveOrUpdateOrderLimitMultiple(OrderLimitSaveReqDto reqDto) {
+        
+        try {
+            log.info("주문 제한 설정 다중 저장 시작 - brandCode: {}, 처리 건수: {}", 
+                    reqDto.getBrandCode(), reqDto.getLimits().size());
+            
+            List<OrderLimitRespDto> savedItems = new ArrayList<>();
+            int createCount = 0;
+            int updateCount = 0;
+            
+            // limits 배열 순회하며 개별 저장/수정 처리
+            for (OrderLimitSaveReqDto.OrderLimitItemDto itemDto : reqDto.getLimits()) {
+                try {
+                    OrderLimitRespDto savedItem = saveOrUpdateOrderLimit(itemDto, reqDto.getBrandCode(), reqDto.getHqCode());
+                    savedItems.add(savedItem);
+                    
+                    // 통계 카운트
+                    if (itemDto.getLimitCode() == null) {
+                        createCount++;
+                    } else {
+                        updateCount++;
+                    }
+                    
+                    log.info("주문 제한 설정 처리 완료 - 요일: {}, 타입: {}", 
+                            itemDto.getDayName(), itemDto.getLimitCode() == null ? "생성" : "수정");
+                    
+                } catch (Exception e) {
+                    log.error("주문 제한 설정 처리 중 오류 발생 - 요일: {}, 에러: {}", 
+                            itemDto.getDayName(), e.getMessage());
+                    throw e; // 트랜잭션 롤백을 위해 예외 재발생
+                }
+            }
+            
+            // 성공 메시지 생성
+            String message = String.format("주문 제한 설정 저장 완료 - 생성: %d건, 수정: %d건", createCount, updateCount);
+            
+            log.info("주문 제한 설정 다중 저장 완료 - brandCode: {}, 총 처리: {}건", 
+                    reqDto.getBrandCode(), savedItems.size());
+            
+            return RespDto.success(message, savedItems);
+            
+        } catch (Exception e) {
+            log.error("주문 제한 설정 다중 저장 중 오류 발생 - brandCode: {}", reqDto.getBrandCode(), e);
+            return RespDto.fail("주문 제한 설정 저장 중 오류가 발생했습니다: " + e.getMessage());
+        }
     }
     
     /**
@@ -161,16 +193,11 @@ public class SettingService {
     @Transactional
     public RespDto<Void> deleteOrderLimit(Integer limitCode) {
         
-        // 1. 삭제 대상 존재 여부 확인
         if (!orderLimitSetRepository.existsById(limitCode)) {
-            // 데이터가 존재하지 않을 경우, RespDto.fail() 반환
             return RespDto.fail("존재하지 않는 주문제한설정코드입니다.");
         }
         
-        // 2. 삭제 실행
         orderLimitSetRepository.deleteById(limitCode);
-        
-        // 3. 삭제 성공 시 RespDto.success() 반환
         return RespDto.success("주문 제한 설정 삭제 완료", null);
     }
 }

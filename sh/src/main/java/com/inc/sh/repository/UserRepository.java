@@ -17,6 +17,11 @@ public interface UserRepository extends JpaRepository<User, String> {
     User findByUserCode(@Param("userCode") String userCode);
     
     /**
+     * 본사코드와 사원코드로 사원 조회
+     */
+    User findByHqCodeAndUserCode(@Param("hqCode") Integer hqCode, @Param("userCode") String userCode);
+    
+    /**
      * 사번 존재 여부 확인
      */
     boolean existsByUserCode(@Param("userCode") String userCode);

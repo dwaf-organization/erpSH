@@ -2,6 +2,7 @@ package com.inc.sh.repository;
 
 import com.inc.sh.entity.Headquarter;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -35,5 +36,5 @@ public interface HeadquarterRepository extends JpaRepository<Headquarter, Intege
     /**
      * 본사접속코드로 본사 조회
      */
-    Headquarter findByHqAccessCode(String hqAccessCode);
+    Headquarter findByHqAccessCode(@Param("hqAccessCode") String hqAccessCode);
 }
