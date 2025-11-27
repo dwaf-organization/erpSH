@@ -2,19 +2,23 @@ package com.inc.sh.service;
 
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.brand.reqDto.BrandReqDto;
+import com.inc.sh.dto.brand.reqDto.BrandDeleteReqDto;
 import com.inc.sh.dto.brand.respDto.BrandRespDto;
 import com.inc.sh.entity.BrandInfo;
 import com.inc.sh.repository.BrandRepository;
 import com.inc.sh.repository.HeadquarterRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BrandService {
 
     private final BrandRepository brandRepository;
@@ -110,7 +114,119 @@ public class BrandService {
     }
 
     /**
-     * 브랜드 삭제
+     * 브랜드 단일 삭제 (호환성 유지용)
+     */
+    @Transactional
+    public RespDto<String> deleteBrandSingle(Integer brandCode) {
+        try {
+            // 브랜드 존재 확인
+            BrandInfo brand = brandRepository.findById(brandCode)
+                    .orElse(null);
+
+            if (brand == null) {
+                return RespDto.fail("존재하지 않는 브랜드입니다: " + brandCode);
+            }
+
+            // 참조 테이블 확인
+            String validationResult = validateBrandDeletion(brandCode);
+            if (validationResult != null) {
+                return RespDto.fail(validationResult);
+            }
+
+            // 삭제
+            brandRepository.delete(brand);
+            
+            return RespDto.success("브랜드가 성공적으로 삭제되었습니다.", "삭제 완료");
+
+        } catch (Exception e) {
+            return RespDto.fail("브랜드 삭제 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 브랜드 다중 삭제 (새로 추가된 메서드)
+     */
+    @Transactional
+    public RespDto<String> deleteBrandMultiple(BrandDeleteReqDto deleteDto) {
+        
+        try {
+            log.info("브랜드 다중 삭제 시작 - 삭제 대상: {} 건", deleteDto.getBrandCodes().size());
+            
+            List<Integer> successDeletes = new ArrayList<>();
+            List<String> failedDeletes = new ArrayList<>();
+            
+            // brandCodes 배열 순회하며 개별 삭제 처리
+            for (Integer brandCode : deleteDto.getBrandCodes()) {
+                try {
+                    // 브랜드 존재 확인
+                    BrandInfo brand = brandRepository.findById(brandCode)
+                            .orElse(null);
+                    
+                    if (brand == null) {
+                        failedDeletes.add(brandCode + "(존재하지 않음)");
+                        continue;
+                    }
+
+                    // 참조 테이블 사용 여부 확인
+                    String validationResult = validateBrandDeletion(brandCode);
+                    if (validationResult != null) {
+                        failedDeletes.add(brandCode + "(" + validationResult + ")");
+                        continue;
+                    }
+                    
+                    // 삭제 실행
+                    brandRepository.delete(brand);
+                    successDeletes.add(brandCode);
+                    
+                    log.info("브랜드 삭제 완료 - brandCode: {}", brandCode);
+                    
+                } catch (Exception e) {
+                    log.error("브랜드 삭제 중 오류 발생 - brandCode: {}, 에러: {}", brandCode, e.getMessage());
+                    failedDeletes.add(brandCode + "(삭제 오류)");
+                }
+            }
+            
+            // 성공 메시지 생성
+            String message = String.format("브랜드 삭제 완료 - 성공: %d건, 실패: %d건", 
+                    successDeletes.size(), failedDeletes.size());
+            
+            if (!failedDeletes.isEmpty()) {
+                message += " | 실패 목록: " + String.join(", ", failedDeletes);
+            }
+            
+            log.info("브랜드 다중 삭제 완료 - 총 처리: {}/{}건", 
+                    successDeletes.size(), deleteDto.getBrandCodes().size());
+            
+            return RespDto.success(message, "삭제 완료");
+            
+        } catch (Exception e) {
+            log.error("브랜드 다중 삭제 중 오류 발생", e);
+            return RespDto.fail("브랜드 삭제 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 브랜드 삭제 유효성 검사 (참조 테이블 확인)
+     */
+    private String validateBrandDeletion(Integer brandCode) {
+        
+        // customer 테이블 확인
+        Long customerCount = brandRepository.countCustomersByBrandCode(brandCode);
+        if (customerCount > 0) {
+            return "거래처 " + customerCount + "개 존재";
+        }
+
+        // order_limit_set 테이블 확인
+        Long orderLimitCount = brandRepository.countOrderLimitSetByBrandCode(brandCode);
+        if (orderLimitCount > 0) {
+            return "주문제한설정 " + orderLimitCount + "개 존재";
+        }
+
+        return null; // 삭제 가능
+    }
+
+    /**
+     * 브랜드 삭제 (기존 메서드 - 호환성 유지)
      */
     @Transactional
     public RespDto<Void> deleteBrand(Integer brandCode) {

@@ -18,6 +18,7 @@ import com.inc.sh.dto.headquarter.reqDto.OrderConfigUpdateReqDto;
 import com.inc.sh.dto.headquarter.respDto.HeadquarterRespDto;
 import com.inc.sh.dto.headquarter.respDto.OrderConfigRespDto;
 import com.inc.sh.dto.orderLimitSet.reqDto.OrderLimitSaveReqDto;
+import com.inc.sh.dto.orderLimitSet.reqDto.OrderLimitDeleteReqDto;
 import com.inc.sh.dto.orderLimitSet.respDto.OrderLimitRespDto;
 import com.inc.sh.service.HeadquarterService;
 import com.inc.sh.service.SettingService;
@@ -76,20 +77,19 @@ public class SettingController {
     public ResponseEntity<RespDto<List<OrderLimitRespDto>>> saveOrderLimit(
             @RequestBody OrderLimitSaveReqDto reqDto) {
         
-        // 다중 저장 서비스 호출
         RespDto<List<OrderLimitRespDto>> response = settingService.saveOrUpdateOrderLimitMultiple(reqDto);
         return ResponseEntity.ok(response);
     }
     
     /**
-     * 주문 제한 설정 삭제
-     * DELETE /api/v1/erp/setting/order-limit/{limit_code}
+     * 주문 제한 설정 삭제 (다중 삭제)
+     * DELETE /api/v1/erp/setting/order-limit/delete
      */
-    @DeleteMapping("/order-limit/{limit_code}")
-    public ResponseEntity<RespDto<Void>> deleteOrderLimit(
-            @PathVariable("limit_code") Integer limitCode) {
+    @DeleteMapping("/order-limit/delete")
+    public ResponseEntity<RespDto<String>> deleteOrderLimit(
+            @RequestBody OrderLimitDeleteReqDto deleteDto) {
         
-        RespDto<Void> response = settingService.deleteOrderLimit(limitCode);
+        RespDto<String> response = settingService.deleteOrderLimitMultiple(deleteDto);
         return ResponseEntity.ok(response);
     }
 }

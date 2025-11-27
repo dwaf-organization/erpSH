@@ -13,6 +13,7 @@ import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.headquarter.reqDto.OrderConfigUpdateReqDto;
 import com.inc.sh.dto.headquarter.respDto.OrderConfigRespDto;
 import com.inc.sh.dto.orderLimitSet.reqDto.OrderLimitSaveReqDto;
+import com.inc.sh.dto.orderLimitSet.reqDto.OrderLimitDeleteReqDto;
 import com.inc.sh.dto.orderLimitSet.respDto.OrderLimitRespDto;
 import com.inc.sh.entity.Headquarter;
 import com.inc.sh.entity.OrderLimitSet;
@@ -137,7 +138,7 @@ public class SettingService {
     }
     
     /**
-     * 주문 제한 설정 다중 등록/수정 (새로 추가된 메서드)
+     * 주문 제한 설정 다중 등록/수정
      */
     @Transactional
     public RespDto<List<OrderLimitRespDto>> saveOrUpdateOrderLimitMultiple(OrderLimitSaveReqDto reqDto) {
@@ -150,13 +151,11 @@ public class SettingService {
             int createCount = 0;
             int updateCount = 0;
             
-            // limits 배열 순회하며 개별 저장/수정 처리
             for (OrderLimitSaveReqDto.OrderLimitItemDto itemDto : reqDto.getLimits()) {
                 try {
                     OrderLimitRespDto savedItem = saveOrUpdateOrderLimit(itemDto, reqDto.getBrandCode(), reqDto.getHqCode());
                     savedItems.add(savedItem);
                     
-                    // 통계 카운트
                     if (itemDto.getLimitCode() == null) {
                         createCount++;
                     } else {
@@ -169,11 +168,10 @@ public class SettingService {
                 } catch (Exception e) {
                     log.error("주문 제한 설정 처리 중 오류 발생 - 요일: {}, 에러: {}", 
                             itemDto.getDayName(), e.getMessage());
-                    throw e; // 트랜잭션 롤백을 위해 예외 재발생
+                    throw e;
                 }
             }
             
-            // 성공 메시지 생성
             String message = String.format("주문 제한 설정 저장 완료 - 생성: %d건, 수정: %d건", createCount, updateCount);
             
             log.info("주문 제한 설정 다중 저장 완료 - brandCode: {}, 총 처리: {}건", 
@@ -188,7 +186,59 @@ public class SettingService {
     }
     
     /**
-     * 주문 제한 설정 삭제
+     * 주문 제한 설정 다중 삭제 (새로 추가된 메서드)
+     */
+    @Transactional
+    public RespDto<String> deleteOrderLimitMultiple(OrderLimitDeleteReqDto deleteDto) {
+        
+        try {
+            log.info("주문 제한 설정 다중 삭제 시작 - 삭제 대상: {} 건", deleteDto.getLimitCodes().size());
+            
+            List<Integer> successDeletes = new ArrayList<>();
+            List<String> failedDeletes = new ArrayList<>();
+            
+            // limitCodes 배열 순회하며 개별 삭제 처리
+            for (Integer limitCode : deleteDto.getLimitCodes()) {
+                try {
+                    // 삭제 대상 존재 여부 확인
+                    if (!orderLimitSetRepository.existsById(limitCode)) {
+                        failedDeletes.add(limitCode + "(존재하지 않음)");
+                        continue;
+                    }
+                    
+                    // 삭제 실행
+                    orderLimitSetRepository.deleteById(limitCode);
+                    successDeletes.add(limitCode);
+                    
+                    log.info("주문 제한 설정 삭제 완료 - limitCode: {}", limitCode);
+                    
+                } catch (Exception e) {
+                    log.error("주문 제한 설정 삭제 중 오류 발생 - limitCode: {}, 에러: {}", limitCode, e.getMessage());
+                    failedDeletes.add(limitCode + "(삭제 오류)");
+                }
+            }
+            
+            // 성공 메시지 생성
+            String message = String.format("주문 제한 설정 삭제 완료 - 성공: %d건, 실패: %d건", 
+                    successDeletes.size(), failedDeletes.size());
+            
+            if (!failedDeletes.isEmpty()) {
+                message += " | 실패 목록: " + String.join(", ", failedDeletes);
+            }
+            
+            log.info("주문 제한 설정 다중 삭제 완료 - 총 처리: {}/{}건", 
+                    successDeletes.size(), deleteDto.getLimitCodes().size());
+            
+            return RespDto.success(message, "삭제 완료");
+            
+        } catch (Exception e) {
+            log.error("주문 제한 설정 다중 삭제 중 오류 발생", e);
+            return RespDto.fail("주문 제한 설정 삭제 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 주문 제한 설정 삭제 (기존 단일 삭제 메서드 - 호환성 유지)
      */
     @Transactional
     public RespDto<Void> deleteOrderLimit(Integer limitCode) {
