@@ -148,23 +148,43 @@ public class UserService {
     }
     
     /**
-     * 사번 자동 생성 (2511001 형태)
+     * 사번 자동 생성 (YYMM + hqCode + 001 형태)
      */
-    private String generateUserCode() {
+    private String generateUserCodeWithHqCode(Integer hqCode) {
         // 현재 년월 (YYMM)
         String yearMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMM"));
         
-        // 해당 년월의 마지막 사번 조회
-        String lastUserCode = userRepository.findLastUserCodeByYearMonth(yearMonth);
+        // 해당 년월+본사코드의 마지막 사번 조회
+        String prefix = yearMonth + hqCode.toString();
+        String lastUserCode = userRepository.findLastUserCodeByPrefix(prefix);
         
         int sequence = 1;
-        if (lastUserCode != null && lastUserCode.length() == 7) {
-            // 2511001에서 001 부분 추출
-            String lastSequenceStr = lastUserCode.substring(4);
-            sequence = Integer.parseInt(lastSequenceStr) + 1;
+        if (lastUserCode != null && lastUserCode.startsWith(prefix)) {
+            // 마지막 3자리 추출하여 다음 순번 계산
+            String lastSequenceStr = lastUserCode.substring(prefix.length());
+            if (lastSequenceStr.length() == 3) {
+                try {
+                    sequence = Integer.parseInt(lastSequenceStr) + 1;
+                } catch (NumberFormatException e) {
+                    log.warn("사번 순번 파싱 실패, 기본값 1 사용 - lastUserCode: {}", lastUserCode);
+                    sequence = 1;
+                }
+            }
         }
         
-        return String.format("%s%03d", yearMonth, sequence);
+        String newUserCode = String.format("%s%03d", prefix, sequence);
+        log.info("사번 생성 완료 - hqCode: {}, prefix: {}, sequence: {}, userCode: {}", 
+                hqCode, prefix, sequence, newUserCode);
+        
+        return newUserCode;
+    }
+    
+    /**
+     * 기존 generateUserCode 메서드 (기본 본사코드 1 사용)
+     * 하위 호환성을 위해 유지
+     */
+    private String generateUserCode() {
+        return generateUserCodeWithHqCode(1);
     }
     
     /**

@@ -90,6 +90,25 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
     );
     
     /**
+     * 주문제한 설정용 품목 조회 (본사별)
+     * @param categoryCode 품목분류코드 (완전일치, null 가능)
+     * @param itemName 품명 (부분일치, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 품목 목록
+     */
+    @Query("SELECT i FROM Item i WHERE " +
+           "(:categoryCode IS NULL OR i.categoryCode = :categoryCode) AND " +
+           "(:itemName IS NULL OR i.itemName LIKE %:itemName%) AND " +
+           "i.hqCode = :hqCode AND " +
+           "i.endDt IS NULL " + // 활성 품목만
+           "ORDER BY i.itemCode ASC")
+    List<Item> findForOrderLimitManagementWithHqCode(
+        @Param("categoryCode") Integer categoryCode,
+        @Param("itemName") String itemName,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 거래처별 단가관리용 품목 조회
      * @param categoryCode 분류코드 (완전일치, null 가능)
      * @param itemName 품명 (부분일치, null 가능)
@@ -103,6 +122,25 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
     List<Item> findForItemCustomerPriceManagement(
         @Param("categoryCode") Integer categoryCode,
         @Param("itemName") String itemName
+    );
+    
+    /**
+     * 거래처별 단가관리용 품목 조회 (본사별)
+     * @param categoryCode 분류코드 (완전일치, null 가능)
+     * @param itemName 품명 (부분일치, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 품목 목록
+     */
+    @Query("SELECT i FROM Item i WHERE " +
+           "(:categoryCode IS NULL OR i.categoryCode = :categoryCode) AND " +
+           "(:itemName IS NULL OR i.itemName LIKE %:itemName%) AND " +
+           "i.hqCode = :hqCode AND " +
+           "i.endDt IS NULL " + // 활성 품목만
+           "ORDER BY i.itemCode ASC")
+    List<Item> findForItemCustomerPriceManagementWithHqCode(
+        @Param("categoryCode") Integer categoryCode,
+        @Param("itemName") String itemName,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -122,6 +160,28 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
         @Param("itemCode") Integer itemCode,
         @Param("categoryCode") Integer categoryCode,
         @Param("priceType") Integer priceType
+    );
+    
+    /**
+     * 납품단가관리용 품목 조회 (본사별)
+     * @param itemCode 품목코드 (완전일치, null 가능)
+     * @param categoryCode 분류코드 (완전일치, null 가능)
+     * @param priceType 단가유형 (완전일치, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 품목 목록
+     */
+    @Query("SELECT i FROM Item i WHERE " +
+           "(:itemCode IS NULL OR i.itemCode = :itemCode) AND " +
+           "(:categoryCode IS NULL OR i.categoryCode = :categoryCode) AND " +
+           "(:priceType IS NULL OR i.priceType = :priceType) AND " +
+           "i.hqCode = :hqCode AND " +
+           "i.endDt IS NULL " + // 활성 품목만
+           "ORDER BY i.itemCode ASC")
+    List<Item> findForDeliveryPriceManagementWithHqCode(
+        @Param("itemCode") Integer itemCode,
+        @Param("categoryCode") Integer categoryCode,
+        @Param("priceType") Integer priceType,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -239,5 +299,70 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
         @Param("customerUserCode") Integer customerUserCode,
         @Param("categoryCode") String categoryCode,
         @Param("itemName") String itemName
+    );
+    
+    /**
+     * 복합 조건으로 품목 조회 (Entity 구조에 맞춰 수정)
+     * @param item 품목코드 또는 품목명 (부분검색, null/빈값 가능)
+     * @param categoryCode 분류코드 (null/빈값 가능)
+     * @param priceType 단가유형 (null/빈값/1/2)
+     * @param endDtYn 종료여부 (null/빈값/0/1)
+     * @param orderAvailableYn 주문가능여부 (null/빈값/0/1/2)
+     * @return 조회된 품목 목록
+     */
+    @Query("SELECT i FROM Item i WHERE " +
+	       "(:item IS NULL OR :item = '' OR " +
+	       " STR(i.itemCode) LIKE CONCAT('%', :item, '%') OR " +
+	       " i.itemName LIKE CONCAT('%', :item, '%')) AND " +
+           "(:categoryCode IS NULL OR :categoryCode = '' OR " +
+           " i.categoryCode = CAST(:categoryCode AS integer)) AND " +
+           "(:priceType IS NULL OR :priceType = '' OR " +
+           " i.priceType = CAST(:priceType AS integer)) AND " +
+           "(:endDtYn IS NULL OR :endDtYn = '' OR " +
+           " (CASE WHEN :endDtYn = '1' THEN i.endDt IS NOT NULL " +
+           "       WHEN :endDtYn = '0' THEN i.endDt IS NULL END)) AND " +
+           "(:orderAvailableYn IS NULL OR :orderAvailableYn = '' OR " +
+           " i.orderAvailableYn = CAST(:orderAvailableYn AS integer)) " +
+           "ORDER BY i.itemCode DESC")
+    List<Item> findBySearchConditionsUpdated(
+        @Param("item") String item,
+        @Param("categoryCode") String categoryCode,
+        @Param("priceType") String priceType,
+        @Param("endDtYn") String endDtYn,
+        @Param("orderAvailableYn") String orderAvailableYn
+    );
+    
+    /**
+     * 복합 조건으로 품목 조회 (본사별)
+     * @param item 품목코드 또는 품목명 (부분검색, null/빈값 가능)
+     * @param categoryCode 분류코드 (null/빈값 가능)
+     * @param priceType 단가유형 (null/빈값/1/2)
+     * @param endDtYn 종료여부 (null/빈값/0/1)
+     * @param orderAvailableYn 주문가능여부 (null/빈값/0/1/2)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 품목 목록
+     */
+    @Query("SELECT i FROM Item i WHERE " +
+	       "(:item IS NULL OR :item = '' OR " +
+	       " STR(i.itemCode) LIKE CONCAT('%', :item, '%') OR " +
+	       " i.itemName LIKE CONCAT('%', :item, '%')) AND " +
+           "(:categoryCode IS NULL OR :categoryCode = '' OR " +
+           " i.categoryCode = CAST(:categoryCode AS integer)) AND " +
+           "(:priceType IS NULL OR :priceType = '' OR " +
+           " i.priceType = CAST(:priceType AS integer)) AND " +
+           "(:endDtYn IS NULL OR :endDtYn = '' OR " +
+           " (CASE WHEN :endDtYn = '1' THEN i.endDt IS NOT NULL " +
+           "       WHEN :endDtYn = '0' THEN i.endDt IS NULL END)) AND " +
+           "(:orderAvailableYn IS NULL OR :orderAvailableYn = '' OR " +
+           " i.orderAvailableYn = CAST(:orderAvailableYn AS integer)) AND " +
+           "i.hqCode = :hqCode " +
+           "ORDER BY i.itemCode DESC")
+    List<Item> findBySearchConditionsUpdatedWithHqCode(
+        @Param("item") String item,
+        @Param("categoryCode") String categoryCode,
+        @Param("priceType") String priceType,
+        @Param("endDtYn") String endDtYn,
+        @Param("orderAvailableYn") String orderAvailableYn,
+        @Param("hqCode") Integer hqCode
     );
 }

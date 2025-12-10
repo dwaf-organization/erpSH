@@ -34,7 +34,7 @@ public class Deposits {
     private Integer depositAmount;
     
     @Column(name = "deposit_method", length = 250)
-    private String depositMethod;
+    private Integer depositMethod; // 0=후입금, 1=충전형
     
     @Column(name = "depositor_name", length = 250)
     private String depositorName;

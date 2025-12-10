@@ -44,23 +44,24 @@ public class ItemCustomerPriceService {
     @Transactional(readOnly = true)
     public RespDto<List<ItemForCustomerPriceRespDto>> getItemListForCustomerPrice(ItemCustomerPriceSearchDto searchDto) {
         try {
-            log.info("거래처별 단가관리 품목 조회 시작 - categoryCode: {}, itemName: {}", 
-                    searchDto.getCategoryCode(), searchDto.getItemName());
+            log.info("거래처별 단가관리 품목 조회 시작 - categoryCode: {}, itemName: {}, hqCode: {}", 
+                    searchDto.getCategoryCode(), searchDto.getItemName(), searchDto.getHqCode());
             
-            List<Item> items = itemRepository.findForItemCustomerPriceManagement(
+            List<Item> items = itemRepository.findForItemCustomerPriceManagementWithHqCode(
                     searchDto.getCategoryCode(),
-                    searchDto.getItemName()
+                    searchDto.getItemName(),
+                    searchDto.getHqCode()
             );
             
             List<ItemForCustomerPriceRespDto> responseList = items.stream()
                     .map(ItemForCustomerPriceRespDto::fromEntity)
                     .collect(Collectors.toList());
             
-            log.info("거래처별 단가관리 품목 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("거래처별 단가관리 품목 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("품목 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("거래처별 단가관리 품목 조회 중 오류 발생", e);
+            log.error("거래처별 단가관리 품목 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("품목 목록 조회 중 오류가 발생했습니다.");
         }
     }
@@ -68,12 +69,13 @@ public class ItemCustomerPriceService {
     /**
      * 품목별 거래처 단가 조회
      * @param itemCode 품목코드
+     * @param hqCode 본사코드
      * @return 거래처별 단가 정보
      */
     @Transactional(readOnly = true)
-    public RespDto<List<CustomerPriceRespDto>> getCustomerPricesByItem(Integer itemCode) {
+    public RespDto<List<CustomerPriceRespDto>> getCustomerPricesByItem(Integer itemCode, Integer hqCode) {
         try {
-            log.info("품목별 거래처 단가 조회 시작 - itemCode: {}", itemCode);
+            log.info("품목별 거래처 단가 조회 시작 - itemCode: {}, hqCode: {}", itemCode, hqCode);
             
             // 품목 정보 조회
             Item item = itemRepository.findByItemCode(itemCode);
@@ -82,8 +84,8 @@ public class ItemCustomerPriceService {
                 return RespDto.fail("품목을 찾을 수 없습니다.");
             }
             
-            // 주문 가능한 거래처 조회 (브랜드명 포함)
-            List<CustomerWithBrandDto> orderableCustomers = getOrderableCustomersWithBrand(item);
+            // 주문 가능한 거래처 조회 (브랜드명 포함, 본사별)
+            List<CustomerWithBrandDto> orderableCustomers = getOrderableCustomersWithBrandByHqCode(item, hqCode);
             
             // 품목별 거래처 단가 조회
             List<ItemCustomerPrice> customerPrices = itemCustomerPriceRepository.findByItemCode(itemCode);
@@ -107,11 +109,11 @@ public class ItemCustomerPriceService {
                 responseList.add(dto);
             }
             
-            log.info("품목별 거래처 단가 조회 완료 - itemCode: {}, 거래처 수: {}", itemCode, responseList.size());
+            log.info("품목별 거래처 단가 조회 완료 - itemCode: {}, hqCode: {}, 거래처 수: {}", itemCode, hqCode, responseList.size());
             return RespDto.success("거래처 단가 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("품목별 거래처 단가 조회 중 오류 발생 - itemCode: {}", itemCode, e);
+            log.error("품목별 거래처 단가 조회 중 오류 발생 - itemCode: {}, hqCode: {}", itemCode, hqCode, e);
             return RespDto.fail("거래처 단가 조회 중 오류가 발생했습니다.");
         }
     }
@@ -247,6 +249,38 @@ public class ItemCustomerPriceService {
                         .message("거래처 단가가 생성되었습니다.")
                         .build();
             }
+        }
+    }
+    
+    /**
+     * 주문 가능한 거래처 조회 (브랜드명 포함, 본사별)
+     */
+    private List<CustomerWithBrandDto> getOrderableCustomersWithBrandByHqCode(Item item, Integer hqCode) {
+        if (item.getOrderAvailableYn() == 0) {
+            // 전체불가 → 빈 목록 반환
+            return Collections.emptyList();
+        } else if (item.getOrderAvailableYn() == 1) {
+            // 전체가능 → 모든 거래처 (본사별)
+            List<Object[]> results = customerRepository.findAllActiveCustomersWithBrandByHqCode(hqCode);
+            return results.stream()
+                    .map(CustomerWithBrandDto::of)
+                    .collect(Collectors.toList());
+        } else if (item.getOrderAvailableYn() == 2) {
+            // 선택불가 → 제한된 거래처 제외 (본사별)
+            List<Integer> limitedCustomerCodes = orderLimitCustomerRepository.findCustomerCodesByItemCode(item.getItemCode());
+            if (limitedCustomerCodes.isEmpty()) {
+                limitedCustomerCodes = List.of(-1); // 빈 IN 절 방지
+            }
+            List<Object[]> results = customerRepository.findOrderableCustomersWithBrandExcludingByHqCode(limitedCustomerCodes, hqCode);
+            return results.stream()
+                    .map(CustomerWithBrandDto::of)
+                    .collect(Collectors.toList());
+        } else {
+            // 기본값: 모든 거래처 (본사별)
+            List<Object[]> results = customerRepository.findAllActiveCustomersWithBrandByHqCode(hqCode);
+            return results.stream()
+                    .map(CustomerWithBrandDto::of)
+                    .collect(Collectors.toList());
         }
     }
     

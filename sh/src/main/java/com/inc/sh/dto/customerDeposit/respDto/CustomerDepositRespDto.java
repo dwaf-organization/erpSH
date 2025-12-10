@@ -14,7 +14,7 @@ public class CustomerDepositRespDto {
     private String customerName;        // 거래처명
     private String depositDate;         // 입금일자 (YYYY-MM-DD)
     private Integer depositAmount;      // 입금금액
-    private String depositMethod;       // 입금유형 (0=일반입금, 1=가상계좌)
+    private Integer depositMethod;       // 입금유형 (0=일반입금, 1=가상계좌)
     private String depositorName;       // 입금자명
     private String note;                // 비고
 }

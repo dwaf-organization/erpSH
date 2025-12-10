@@ -29,11 +29,29 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Integer> {
      */
     @Query("SELECT v FROM Vehicle v WHERE " +
            "(:vehicleCode IS NULL OR v.vehicleCode = :vehicleCode) AND " +
-           "(:category IS NULL OR v.category = :category) " +
+           "(:category IS NULL OR :category = '' OR v.category = :category) " +
            "ORDER BY v.vehicleCode ASC")
     List<Vehicle> findBySearchConditions(
         @Param("vehicleCode") Integer vehicleCode,
         @Param("category") String category
+    );
+    
+    /**
+     * 검색 조건으로 차량 조회 (본사별)
+     * @param vehicleCode 차량코드 (완전일치, null 가능)
+     * @param category 구분 (냉장,냉동,상온, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 차량 목록
+     */
+    @Query("SELECT v FROM Vehicle v WHERE " +
+           "(:vehicleCode IS NULL OR v.vehicleCode = :vehicleCode) AND " +
+           "(:category IS NULL OR :category = '' OR v.category = :category) AND " +
+           "v.hqCode = :hqCode " +
+           "ORDER BY v.vehicleCode ASC")
+    List<Vehicle> findBySearchConditionsWithHqCode(
+        @Param("vehicleCode") Integer vehicleCode,
+        @Param("category") String category,
+        @Param("hqCode") Integer hqCode
     );
     
     /**

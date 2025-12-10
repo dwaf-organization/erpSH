@@ -1,8 +1,11 @@
 package com.inc.sh.controller;
 
 import com.inc.sh.common.dto.RespDto;
+import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountDeleteReqDto;
 import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountReqDto;
+import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountSaveReqDto;
 import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountSearchDto;
+import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountBatchResult;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountDeleteRespDto;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountRespDto;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountSaveRespDto;
@@ -24,31 +27,23 @@ public class VirtualAccountController {
     private final VirtualAccountService virtualAccountService;
 
     /**
-     * 가상계좌 목록 조회
+     * 가상계좌 목록 조회 (수정됨 - hqCode 추가, 거래처명 포함)
      * GET /api/v1/erp/virtual-account/list
      */
     @GetMapping("/list")
     public ResponseEntity<RespDto<List<VirtualAccountRespDto>>> getVirtualAccountList(
+            @RequestParam("hqCode") Integer hqCode,
             @RequestParam(value = "linkedCustomerCode", required = false) Integer linkedCustomerCode,
-            @RequestParam(value = "virtualAccountStatus", required = false) String virtualAccountStatus,
-            @RequestParam(value = "closeDtYn", required = false) String closeDtYn) {
+            @RequestParam(value = "virtualAccountStatus", defaultValue = "전체") String virtualAccountStatus,
+            @RequestParam(value = "closeDtYn", defaultValue = "전체") String closeDtYn) {
         
-        log.info("가상계좌 목록 조회 요청 - linkedCustomerCode: {}, virtualAccountStatus: {}, closeDtYn: {}", 
-                linkedCustomerCode, virtualAccountStatus, closeDtYn);
+        log.info("가상계좌 목록 조회 요청 - hqCode: {}, linkedCustomerCode: {}, virtualAccountStatus: {}, closeDtYn: {}", 
+                hqCode, linkedCustomerCode, virtualAccountStatus, closeDtYn);
         
-        VirtualAccountSearchDto searchDto = VirtualAccountSearchDto.builder()
-                .linkedCustomerCode(linkedCustomerCode)
-                .virtualAccountStatus(virtualAccountStatus)
-                .closeDtYn(closeDtYn)
-                .build();
+        RespDto<List<VirtualAccountRespDto>> response = virtualAccountService.getVirtualAccountList(
+                hqCode, linkedCustomerCode, virtualAccountStatus, closeDtYn);
         
-        RespDto<List<VirtualAccountRespDto>> response = virtualAccountService.getVirtualAccountList(searchDto);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -71,28 +66,43 @@ public class VirtualAccountController {
     }
 
     /**
-     * 가상계좌 저장 (신규/수정)
+     * 가상계좌 다중 저장 (신규/수정)
      * POST /api/v1/erp/virtual-account/save
      */
     @PostMapping("/save")
-    public ResponseEntity<RespDto<VirtualAccountSaveRespDto>> saveVirtualAccount(
-            @Valid @RequestBody VirtualAccountReqDto request) {
+    public ResponseEntity<RespDto<VirtualAccountBatchResult>> saveVirtualAccounts(@RequestBody VirtualAccountSaveReqDto request) {
         
-        if (request.getVirtualAccountCode() == null) {
-            log.info("가상계좌 신규 등록 요청 - virtualAccountNum: {}, bankName: {}, linkedCustomerCode: {}", 
-                    request.getVirtualAccountNum(), request.getBankName(), request.getLinkedCustomerCode());
-        } else {
-            log.info("가상계좌 수정 요청 - virtualAccountCode: {}, virtualAccountNum: {}, linkedCustomerCode: {}", 
-                    request.getVirtualAccountCode(), request.getVirtualAccountNum(), request.getLinkedCustomerCode());
+        log.info("가상계좌 다중 저장 요청 - 총 {}건", 
+                request.getVirtualAccounts() != null ? request.getVirtualAccounts().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getVirtualAccounts() == null || request.getVirtualAccounts().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 가상계좌 데이터가 없습니다."));
         }
         
-        RespDto<VirtualAccountSaveRespDto> response = virtualAccountService.saveVirtualAccount(request);
+        RespDto<VirtualAccountBatchResult> response = virtualAccountService.saveVirtualAccounts(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 가상계좌 다중 삭제 (Hard Delete)
+     * DELETE /api/v1/erp/virtual-account/delete
+     */
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<VirtualAccountBatchResult>> deleteVirtualAccounts(@RequestBody VirtualAccountDeleteReqDto request) {
         
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        log.info("가상계좌 다중 삭제 요청 - 총 {}건", 
+                request.getVirtualAccountCodes() != null ? request.getVirtualAccountCodes().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getVirtualAccountCodes() == null || request.getVirtualAccountCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 가상계좌 코드가 없습니다."));
         }
+        
+        RespDto<VirtualAccountBatchResult> response = virtualAccountService.deleteVirtualAccounts(request);
+        return ResponseEntity.ok(response);
     }
 
     /**

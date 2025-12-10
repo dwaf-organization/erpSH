@@ -12,6 +12,11 @@ import java.util.List;
 public interface MenuInfoRepository extends JpaRepository<MenuInfo, Integer> {
     
     /**
+     * 모든 메뉴 조회 (순서별)
+     */
+    List<MenuInfo> findAllByOrderByMenuLevelAscMenuOrderAsc();
+    
+    /**
      * 메뉴코드로 메뉴 조회
      */
     MenuInfo findByMenuCode(@Param("menuCode") Integer menuCode);

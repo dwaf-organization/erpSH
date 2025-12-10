@@ -2,10 +2,12 @@ package com.inc.sh.service;
 
 import com.inc.sh.dto.deliveryHoliday.reqDto.DeliveryHolidaySearchDto;
 import com.inc.sh.dto.deliveryHoliday.reqDto.BasicHolidayReqDto;
+import com.inc.sh.dto.deliveryHoliday.reqDto.DeliveryHolidayDeleteReqDto;
 import com.inc.sh.dto.deliveryHoliday.reqDto.RegularHolidayReqDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayRespDto;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidaySaveRespDto;
+import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayBatchResult;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayDeleteRespDto;
 import com.inc.sh.entity.DeliveryHoliday;
 import com.inc.sh.entity.BrandInfo;
@@ -17,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -169,37 +172,90 @@ public class DeliveryHolidayService {
     }
     
     /**
-     * 배송휴일 삭제 (하드 삭제)
-     * @param deliveryHolidayCode 배송휴일코드
-     * @return 삭제 결과
+     * 배송휴일 다중 삭제 (Hard Delete)
      */
-    public RespDto<DeliveryHolidayDeleteRespDto> deleteDeliveryHoliday(Integer deliveryHolidayCode) {
-        try {
-            log.info("배송휴일 삭제 시작 - deliveryHolidayCode: {}", deliveryHolidayCode);
-            
-            DeliveryHoliday holiday = deliveryHolidayRepository.findByDeliveryHolidayCode(deliveryHolidayCode);
-            if (holiday == null) {
-                log.warn("삭제할 배송휴일을 찾을 수 없습니다 - deliveryHolidayCode: {}", deliveryHolidayCode);
-                return RespDto.fail("삭제할 배송휴일을 찾을 수 없습니다.");
+    @Transactional
+    public RespDto<DeliveryHolidayBatchResult> deleteDeliveryHolidays(DeliveryHolidayDeleteReqDto reqDto) {
+        
+        log.info("배송휴일 다중 삭제 시작 - 총 {}건", reqDto.getDeliveryHolidayCodes().size());
+        
+        List<DeliveryHolidayDeleteRespDto> successData = new ArrayList<>();
+        List<DeliveryHolidayBatchResult.DeliveryHolidayErrorDto> failData = new ArrayList<>();
+        
+        for (Integer deliveryHolidayCode : reqDto.getDeliveryHolidayCodes()) {
+            try {
+                // 개별 배송휴일 삭제 처리
+                DeliveryHolidayDeleteRespDto deletedHoliday = deleteSingleDeliveryHoliday(deliveryHolidayCode);
+                successData.add(deletedHoliday);
+                
+                log.info("배송휴일 삭제 성공 - deliveryHolidayCode: {}", deliveryHolidayCode);
+                
+            } catch (Exception e) {
+                log.error("배송휴일 삭제 실패 - deliveryHolidayCode: {}, 에러: {}", deliveryHolidayCode, e.getMessage());
+                
+                // 에러 시 휴일명 조회 시도
+                String holidayName = getHolidayNameSafely(deliveryHolidayCode);
+                
+                DeliveryHolidayBatchResult.DeliveryHolidayErrorDto errorDto = DeliveryHolidayBatchResult.DeliveryHolidayErrorDto.builder()
+                        .deliveryHolidayCode(deliveryHolidayCode)
+                        .holidayName(holidayName)
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
             }
-            
-            // 하드 삭제 진행
-            deliveryHolidayRepository.delete(holiday);
-            
-            // 응답 생성
-            DeliveryHolidayDeleteRespDto responseDto = DeliveryHolidayDeleteRespDto.builder()
-                    .deliveryHolidayCode(deliveryHolidayCode)
-                    .message("배송휴일이 성공적으로 삭제되었습니다.")
-                    .build();
-            
-            log.info("배송휴일 삭제 완료 - deliveryHolidayCode: {}, holidayName: {}", 
-                    deliveryHolidayCode, holiday.getHolidayName());
-            
-            return RespDto.success("배송휴일이 성공적으로 삭제되었습니다.", responseDto);
-            
+        }
+        
+        // 배치 결과 생성
+        DeliveryHolidayBatchResult result = DeliveryHolidayBatchResult.builder()
+                .totalCount(reqDto.getDeliveryHolidayCodes().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("배송휴일 삭제 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("배송휴일 다중 삭제 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getDeliveryHolidayCodes().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 배송휴일 삭제 처리 (Hard Delete)
+     */
+    private DeliveryHolidayDeleteRespDto deleteSingleDeliveryHoliday(Integer deliveryHolidayCode) {
+        
+        // 배송휴일 존재 확인
+        DeliveryHoliday deliveryHoliday = deliveryHolidayRepository.findById(deliveryHolidayCode)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 배송휴일입니다: " + deliveryHolidayCode));
+
+        // Hard Delete - 실제 레코드 삭제
+        deliveryHolidayRepository.delete(deliveryHoliday);
+        
+        log.info("배송휴일 삭제 완료 - deliveryHolidayCode: {}, holidayName: {}", 
+                deliveryHolidayCode, deliveryHoliday.getHolidayName());
+        
+        // 삭제 응답 생성
+        return DeliveryHolidayDeleteRespDto.builder()
+                .deliveryHolidayCode(deliveryHolidayCode)
+                .message(String.format("'%s' 휴일이 삭제되었습니다.", deliveryHoliday.getHolidayName()))
+                .build();
+    }
+    
+    /**
+     * 휴일명 안전 조회 (에러 발생시 사용)
+     */
+    private String getHolidayNameSafely(Integer deliveryHolidayCode) {
+        try {
+            return deliveryHolidayRepository.findById(deliveryHolidayCode)
+                    .map(DeliveryHoliday::getHolidayName)
+                    .orElse("알 수 없음");
         } catch (Exception e) {
-            log.error("배송휴일 삭제 중 오류 발생 - deliveryHolidayCode: {}", deliveryHolidayCode, e);
-            return RespDto.fail("배송휴일 삭제 중 오류가 발생했습니다.");
+            return "조회 실패";
         }
     }
     

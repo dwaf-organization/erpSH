@@ -1,7 +1,9 @@
 package com.inc.sh.controller;
 
 import com.inc.sh.dto.inventory.reqDto.InventorySearchDto;
+import com.inc.sh.dto.inventory.reqDto.InventoryDeleteReqDto;
 import com.inc.sh.dto.inventory.reqDto.InventorySaveDto;
+import com.inc.sh.dto.inventory.respDto.InventoryBatchResult;
 import com.inc.sh.dto.inventory.respDto.InventoryRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.service.InventoryService;
@@ -11,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/erp/inventory")
@@ -69,20 +72,33 @@ public class InventoryController {
     }
 
     /**
-     * 재고 삭제
-     * DELETE /api/v1/erp/inventory/delete/{warehouseItemCode}
+     * 재고 다중 삭제 (마감 상태 확인 포함)
+     * DELETE /api/v1/erp/inventory/delete
      */
-    @DeleteMapping("/delete/{warehouseItemCode}")
-    public ResponseEntity<RespDto<String>> deleteInventory(@PathVariable("warehouseItemCode") Integer warehouseItemCode) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<InventoryBatchResult>> deleteInventories(@RequestBody InventoryDeleteReqDto request) {
         
-        log.info("재고 삭제 요청 - 창고품목코드: {}", warehouseItemCode);
+        log.info("재고 다중 삭제 요청 - 총 {}건", 
+                request.getWarehouseItemCodes() != null ? request.getWarehouseItemCodes().size() : 0);
         
-        RespDto<String> response = inventoryService.deleteInventory(warehouseItemCode);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getWarehouseItemCodes() == null || request.getWarehouseItemCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 창고품목코드가 없습니다."));
         }
+        
+        // 중복 제거
+        List<Integer> uniqueCodes = request.getWarehouseItemCodes().stream()
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (uniqueCodes.size() != request.getWarehouseItemCodes().size()) {
+            log.info("중복된 창고품목코드 제거됨 - 원본: {}건, 제거 후: {}건", 
+                    request.getWarehouseItemCodes().size(), uniqueCodes.size());
+            request.setWarehouseItemCodes(uniqueCodes);
+        }
+        
+        RespDto<InventoryBatchResult> response = inventoryService.deleteInventories(request);
+        return ResponseEntity.ok(response);
     }
 }

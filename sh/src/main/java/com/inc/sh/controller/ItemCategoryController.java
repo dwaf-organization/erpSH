@@ -1,13 +1,12 @@
 package com.inc.sh.controller;
 
-import com.inc.sh.dto.itemCategory.reqDto.ItemCategoryReqDto;
+import com.inc.sh.dto.itemCategory.reqDto.ItemCategoryDeleteReqDto;
+import com.inc.sh.dto.itemCategory.reqDto.ItemCategorySaveReqDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.itemCategory.respDto.ItemCategoryTreeRespDto;
 import com.inc.sh.dto.itemCategory.respDto.ItemCategoryTableRespDto;
-import com.inc.sh.dto.itemCategory.respDto.ItemCategorySaveRespDto;
-import com.inc.sh.dto.itemCategory.respDto.ItemCategoryDeleteRespDto;
+import com.inc.sh.dto.itemCategory.respDto.ItemCategoryBatchResult;
 import com.inc.sh.service.ItemCategoryService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -28,11 +27,12 @@ public class ItemCategoryController {
      * GET /api/v1/erp/item-category/tree
      */
     @GetMapping("/tree")
-    public ResponseEntity<RespDto<List<ItemCategoryTreeRespDto>>> getCategoryTreeList() {
+    public ResponseEntity<RespDto<List<ItemCategoryTreeRespDto>>> getCategoryTreeList(
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("트리용 품목분류 전체 조회 요청");
+        log.info("트리용 품목분류 전체 조회 요청 - hqCode: {}", hqCode);
         
-        RespDto<List<ItemCategoryTreeRespDto>> response = itemCategoryService.getCategoryTreeList();
+        RespDto<List<ItemCategoryTreeRespDto>> response = itemCategoryService.getCategoryTreeList(hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);
@@ -46,11 +46,12 @@ public class ItemCategoryController {
      * GET /api/v1/erp/item-category/table
      */
     @GetMapping("/table")
-    public ResponseEntity<RespDto<List<ItemCategoryTableRespDto>>> getCategoryTableList() {
+    public ResponseEntity<RespDto<List<ItemCategoryTableRespDto>>> getCategoryTableList(
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("표용 품목분류 전체 조회 요청");
+        log.info("표용 품목분류 전체 조회 요청 - hqCode: {}", hqCode);
         
-        RespDto<List<ItemCategoryTableRespDto>> response = itemCategoryService.getCategoryTableList();
+        RespDto<List<ItemCategoryTableRespDto>> response = itemCategoryService.getCategoryTableList(hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);
@@ -79,46 +80,42 @@ public class ItemCategoryController {
     }
 
     /**
-     * 품목분류 저장 (신규/수정)
+     * 품목분류 다중 저장 (신규/수정)
      * POST /api/v1/erp/item-category/save
      */
     @PostMapping("/save")
-    public ResponseEntity<RespDto<ItemCategorySaveRespDto>> saveCategory(
-            @Valid @RequestBody ItemCategoryReqDto request) {
+    public ResponseEntity<RespDto<ItemCategoryBatchResult>> saveItemCategories(@RequestBody ItemCategorySaveReqDto request) {
         
-        if (request.getCategoryCode() == null) {
-            log.info("품목분류 신규 등록 요청 - categoryName: {}, parentsCategoryCode: {}", 
-                    request.getCategoryName(), request.getParentsCategoryCode());
-        } else {
-            log.info("품목분류 수정 요청 - categoryCode: {}, categoryName: {}", 
-                    request.getCategoryCode(), request.getCategoryName());
+        log.info("품목분류 다중 저장 요청 - 총 {}건", 
+                request.getItemCategories() != null ? request.getItemCategories().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getItemCategories() == null || request.getItemCategories().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 품목분류 데이터가 없습니다."));
         }
         
-        RespDto<ItemCategorySaveRespDto> response = itemCategoryService.saveCategory(request);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
+        RespDto<ItemCategoryBatchResult> response = itemCategoryService.saveItemCategories(request);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * 품목분류 삭제 (하드 삭제)
-     * DELETE /api/v1/erp/item-category/{categoryCode}
+     * 품목분류 다중 삭제 (Hard Delete)
+     * DELETE /api/v1/erp/item-category/delete
      */
-    @DeleteMapping("/{categoryCode}")
-    public ResponseEntity<RespDto<ItemCategoryDeleteRespDto>> deleteCategory(
-            @PathVariable("categoryCode") Integer categoryCode) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<ItemCategoryBatchResult>> deleteItemCategories(@RequestBody ItemCategoryDeleteReqDto request) {
         
-        log.info("품목분류 삭제 요청 - categoryCode: {}", categoryCode);
+        log.info("품목분류 다중 삭제 요청 - 총 {}건", 
+                request.getCategoryCodes() != null ? request.getCategoryCodes().size() : 0);
         
-        RespDto<ItemCategoryDeleteRespDto> response = itemCategoryService.deleteCategory(categoryCode);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getCategoryCodes() == null || request.getCategoryCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 품목분류 코드가 없습니다."));
         }
+        
+        RespDto<ItemCategoryBatchResult> response = itemCategoryService.deleteItemCategories(request);
+        return ResponseEntity.ok(response);
     }
 }

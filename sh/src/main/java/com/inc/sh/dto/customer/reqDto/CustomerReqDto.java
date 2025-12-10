@@ -42,7 +42,7 @@ public class CustomerReqDto {
     private String telNum;
     private String mobileNum;
     private String faxNum; // 부가세여부
-    private Integer taxInvoiceYn; // 세금계산서발행여부
+    private String taxInvoiceYn; // 세금계산서발행여부
     private String taxInvoiceName;
     private String printNote;
     private String bankName;
@@ -84,7 +84,7 @@ public class CustomerReqDto {
                 .telNum(this.telNum)
                 .mobileNum(this.mobileNum)
                 .faxNum(this.faxNum)
-                .taxInvoiceYn(this.taxInvoiceYn != null ? this.taxInvoiceYn : 0)
+                .taxInvoiceYn(this.taxInvoiceYn)
                 .taxInvoiceName(this.taxInvoiceName)
                 .regDt(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")))
                 .printNote(this.printNote)

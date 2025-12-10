@@ -43,6 +43,15 @@ public interface ItemCategoryRepository extends JpaRepository<ItemCategory, Inte
     List<ItemCategory> findByParentAndChildren(@Param("categoryCode") Integer categoryCode);
     
     /**
+     * 특정 분류와 그 하위 분류 조회 (본사별)
+     * @param categoryCode 기준 분류코드
+     * @param hqCode 본사코드
+     * @return 본인 + 하위 분류 목록
+     */
+    @Query("SELECT ic FROM ItemCategory ic WHERE (ic.categoryCode = :categoryCode OR ic.parentsCategoryCode = :categoryCode) ORDER BY ic.categoryLevel, ic.categoryCode")
+    List<ItemCategory> findByParentAndChildrenWithHqCode(@Param("categoryCode") Integer categoryCode);
+    
+    /**
      * 상위 분류별 하위 분류 조회
      */
     List<ItemCategory> findByParentsCategoryCodeOrderByCategoryLevel(Integer parentsCategoryCode);
@@ -72,4 +81,48 @@ public interface ItemCategoryRepository extends JpaRepository<ItemCategory, Inte
            "AND (:hqCode IS NULL OR sub.hqCode = :hqCode) " +
            "ORDER BY major.categoryCode, sub.categoryCode")
     List<Object[]> findSubCategoriesWithMajorName(@Param("hqCode") Integer hqCode);
+    
+    /**
+     * 하위 분류 존재 여부 확인 (삭제 방지용)
+     */
+    @Query("SELECT COUNT(ic) FROM ItemCategory ic WHERE ic.parentsCategoryCode = :categoryCode")
+    Long countByParentsCategoryCode(@Param("categoryCode") Integer categoryCode);
+    
+    /**
+     * 특정 분류를 사용하는 품목 개수 확인 (네이티브 쿼리로 변경)
+     */
+    @Query(value = "SELECT COUNT(*) FROM item i WHERE i.major_category_code = :categoryCode OR i.middle_category_code = :categoryCode", 
+           nativeQuery = true)
+    Long countItemsByCategoryCode(@Param("categoryCode") Integer categoryCode);
+    
+    /**
+     * 품목코드로 분류명 조회 (대분류명-중분류명 조합)
+     * @param itemCode 품목코드
+     * @return 분류명 (대분류명 또는 대분류명-중분류명)
+     */
+    @Query(value = "SELECT " +
+           "CASE " +
+           "  WHEN parent.category_code IS NOT NULL THEN CONCAT(parent.category_name, '-', child.category_name) " +
+           "  ELSE child.category_name " +
+           "END as category_name " +
+           "FROM item i " +
+           "LEFT JOIN item_category child ON i.category_code = child.category_code " +
+           "LEFT JOIN item_category parent ON child.parents_category_code = parent.category_code AND child.parents_category_code > 0 " +
+           "WHERE i.item_code = :itemCode", nativeQuery = true)
+    String findCategoryNameByItemCode(@Param("itemCode") Integer itemCode);
+    
+    /**
+     * 분류코드로 분류명 조회 (대분류명-중분류명 조합)
+     * @param categoryCode 분류코드
+     * @return 분류명 (대분류명 또는 대분류명-중분류명)
+     */
+    @Query(value = "SELECT " +
+           "CASE " +
+           "  WHEN parent.category_code IS NOT NULL THEN CONCAT(parent.category_name, '-', child.category_name) " +
+           "  ELSE child.category_name " +
+           "END as category_name " +
+           "FROM item_category child " +
+           "LEFT JOIN item_category parent ON child.parents_category_code = parent.category_code AND child.parents_category_code > 0 " +
+           "WHERE child.category_code = :categoryCode", nativeQuery = true)
+    String findCategoryNameByCategoryCode(@Param("categoryCode") Integer categoryCode);
 }

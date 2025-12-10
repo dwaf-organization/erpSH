@@ -1,10 +1,13 @@
 package com.inc.sh.controller;
 
+import com.inc.sh.dto.item.reqDto.ItemDeleteReqDto;
 import com.inc.sh.dto.item.reqDto.ItemReqDto;
+import com.inc.sh.dto.item.reqDto.ItemSaveReqDto;
 import com.inc.sh.dto.item.reqDto.ItemSearchDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.item.respDto.ItemRespDto;
 import com.inc.sh.dto.item.respDto.ItemSaveRespDto;
+import com.inc.sh.dto.item.respDto.ItemBatchResult;
 import com.inc.sh.dto.item.respDto.ItemDeleteRespDto;
 import com.inc.sh.service.ItemService;
 import jakarta.validation.Valid;
@@ -24,37 +27,25 @@ public class ItemController {
     private final ItemService itemService;
 
     /**
-     * 품목 목록 조회
+     * 품목 목록 조회 (수정됨 - item 통합검색)
      * GET /api/v1/erp/item/list
      */
     @GetMapping("/list")
     public ResponseEntity<RespDto<List<ItemRespDto>>> getItemList(
-            @RequestParam(value = "itemCode", required = false) String itemCode,
-            @RequestParam(value = "itemName", required = false) String itemName,
-            @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "priceType", required = false) Integer priceType,
-            @RequestParam(value = "endDtYn", required = false) Integer endDtYn,
-            @RequestParam(value = "orderAvailableYn", required = false) Integer orderAvailableYn) {
+            @RequestParam(value = "item", required = false) String item,
+            @RequestParam(value = "categoryCode", required = false) String categoryCode,
+            @RequestParam(value = "priceType", required = false) String priceType,
+            @RequestParam(value = "endDtYn", required = false) String endDtYn,
+            @RequestParam(value = "orderAvailableYn", required = false) String orderAvailableYn,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("품목 목록 조회 요청 - itemCode: {}, itemName: {}, categoryCode: {}, priceType: {}, endDtYn: {}, orderAvailableYn: {}", 
-                itemCode, itemName, categoryCode, priceType, endDtYn, orderAvailableYn);
+        log.info("품목 목록 조회 요청 - item: {}, categoryCode: {}, priceType: {}, endDtYn: {}, orderAvailableYn: {}, hqCode: {}", 
+                item, categoryCode, priceType, endDtYn, orderAvailableYn, hqCode);
         
-        ItemSearchDto searchDto = ItemSearchDto.builder()
-                .itemCode(itemCode)
-                .itemName(itemName)
-                .categoryCode(categoryCode)
-                .priceType(priceType)
-                .endDtYn(endDtYn)
-                .orderAvailableYn(orderAvailableYn)
-                .build();
+        RespDto<List<ItemRespDto>> response = itemService.getItemList(
+                item, categoryCode, priceType, endDtYn, orderAvailableYn, hqCode);
         
-        RespDto<List<ItemRespDto>> response = itemService.getItemList(searchDto);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -77,46 +68,42 @@ public class ItemController {
     }
 
     /**
-     * 품목 저장 (신규/수정)
+     * 품목 다중 저장 (신규/수정)
      * POST /api/v1/erp/item/save
      */
     @PostMapping("/save")
-    public ResponseEntity<RespDto<ItemSaveRespDto>> saveItem(
-            @Valid @RequestBody ItemReqDto request) {
+    public ResponseEntity<RespDto<ItemBatchResult>> saveItems(@RequestBody ItemSaveReqDto request) {
         
-        if (request.getItemCode() == null) {
-            log.info("품목 신규 등록 요청 - itemName: {}, categoryCode: {}", 
-                    request.getItemName(), request.getCategoryCode());
-        } else {
-            log.info("품목 수정 요청 - itemCode: {}, itemName: {}", 
-                    request.getItemCode(), request.getItemName());
+        log.info("품목 다중 저장 요청 - 총 {}건", 
+                request.getItems() != null ? request.getItems().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 품목 데이터가 없습니다."));
         }
         
-        RespDto<ItemSaveRespDto> response = itemService.saveItem(request);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
+        RespDto<ItemBatchResult> response = itemService.saveItems(request);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * 품목 삭제 (소프트 삭제)
-     * DELETE /api/v1/erp/item/{itemCode}
+     * 품목 다중 삭제 (Soft Delete)
+     * DELETE /api/v1/erp/item/delete
      */
-    @DeleteMapping("/{itemCode}")
-    public ResponseEntity<RespDto<ItemDeleteRespDto>> deleteItem(
-            @PathVariable("itemCode") Integer itemCode) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<ItemBatchResult>> deleteItems(@RequestBody ItemDeleteReqDto request) {
         
-        log.info("품목 삭제 요청 - itemCode: {}", itemCode);
+        log.info("품목 다중 삭제 요청 - 총 {}건", 
+                request.getItemCodes() != null ? request.getItemCodes().size() : 0);
         
-        RespDto<ItemDeleteRespDto> response = itemService.deleteItem(itemCode);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getItemCodes() == null || request.getItemCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 품목 코드가 없습니다."));
         }
+        
+        RespDto<ItemBatchResult> response = itemService.deleteItems(request);
+        return ResponseEntity.ok(response);
     }
 }

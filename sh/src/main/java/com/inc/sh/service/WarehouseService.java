@@ -1,10 +1,14 @@
 package com.inc.sh.service;
 
 import com.inc.sh.dto.warehouse.reqDto.WarehouseSearchDto;
+import com.inc.sh.dto.warehouse.reqDto.WarehouseDeleteReqDto;
 import com.inc.sh.dto.warehouse.reqDto.WarehouseReqDto;
+import com.inc.sh.dto.warehouse.reqDto.WarehouseSaveReqDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.warehouse.respDto.WarehouseListRespDto;
+import com.inc.sh.dto.warehouse.respDto.WarehouseRespDto;
 import com.inc.sh.dto.warehouse.respDto.WarehouseSaveRespDto;
+import com.inc.sh.dto.warehouse.respDto.WarehouseBatchResult;
 import com.inc.sh.dto.warehouse.respDto.WarehouseDeleteRespDto;
 import com.inc.sh.entity.Warehouse;
 import com.inc.sh.entity.DistCenter;
@@ -17,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,147 +44,227 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public RespDto<List<WarehouseListRespDto>> getWarehouseList(WarehouseSearchDto searchDto) {
         try {
-            log.info("창고 목록 조회 시작 - warehouseCode: {}, distCenterCode: {}", 
-                    searchDto.getWarehouseCode(), searchDto.getDistCenterCode());
+            log.info("창고 목록 조회 시작 - warehouseCode: {}, distCenterCode: {}, hqCode: {}", 
+                    searchDto.getWarehouseCode(), searchDto.getDistCenterCode(), searchDto.getHqCode());
             
-            List<Object[]> warehouses = warehouseRepository.findWarehousesWithDistCenterName(
+            List<Object[]> warehouses = warehouseRepository.findWarehousesWithDistCenterNameAndHqCode(
                     searchDto.getWarehouseCode(),
-                    searchDto.getDistCenterCode()
+                    searchDto.getDistCenterCode(),
+                    searchDto.getHqCode()
             );
             
             List<WarehouseListRespDto> responseList = warehouses.stream()
                     .map(WarehouseListRespDto::of)
                     .collect(Collectors.toList());
             
-            log.info("창고 목록 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("창고 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("창고 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("창고 목록 조회 중 오류 발생", e);
+            log.error("창고 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("창고 목록 조회 중 오류가 발생했습니다.");
         }
     }
-    
     /**
-     * 창고 저장 (신규/수정)
-     * @param request 창고 정보
-     * @return 저장된 창고 코드
+     * 창고 다중 저장 (신규/수정)
      */
-    public RespDto<WarehouseSaveRespDto> saveWarehouse(WarehouseReqDto request) {
-        try {
-            // 본사 존재 확인
-            if (!headquarterRepository.existsByHqCode(request.getHqCode())) {
-                log.warn("본사가 존재하지 않습니다 - hqCode: {}", request.getHqCode());
-                return RespDto.fail("본사가 존재하지 않습니다.");
-            }
-            
-            // 물류센터 존재 확인
-            DistCenter distCenter = distCenterRepository.findByDistCenterCode(request.getDistCenterCode());
-            if (distCenter == null) {
-                log.warn("물류센터가 존재하지 않습니다 - distCenterCode: {}", request.getDistCenterCode());
-                return RespDto.fail("물류센터가 존재하지 않습니다.");
-            }
-            
-            // 물류센터 사용여부 확인
-            if (distCenter.getUseYn() == 0) {
-                log.warn("사용하지 않는 물류센터입니다 - distCenterCode: {}", request.getDistCenterCode());
-                return RespDto.fail("사용하지 않는 물류센터입니다.");
-            }
-            
-            Warehouse savedWarehouse;
-            String action;
-            
-            if (request.getWarehouseCode() == null) {
-                // 신규 등록
-                log.info("창고 신규 등록 시작 - warehouseName: {}, distCenterCode: {}", 
-                        request.getWarehouseName(), request.getDistCenterCode());
+    @Transactional
+    public RespDto<WarehouseBatchResult> saveWarehouses(WarehouseSaveReqDto reqDto) {
+        
+        log.info("창고 다중 저장 시작 - 총 {}건", reqDto.getWarehouses().size());
+        
+        List<WarehouseRespDto> successData = new ArrayList<>();
+        List<WarehouseBatchResult.WarehouseErrorDto> failData = new ArrayList<>();
+        
+        for (WarehouseSaveReqDto.WarehouseItemDto warehouse : reqDto.getWarehouses()) {
+            try {
+                // 개별 창고 저장 처리
+                WarehouseRespDto savedWarehouse = saveSingleWarehouse(warehouse);
+                successData.add(savedWarehouse);
                 
-                Warehouse warehouse = request.toEntity();
-                savedWarehouse = warehouseRepository.save(warehouse);
-                action = "등록";
+                log.info("창고 저장 성공 - warehouseCode: {}, warehouseName: {}", 
+                        savedWarehouse.getWarehouseCode(), savedWarehouse.getWarehouseName());
                 
-            } else {
-                // 수정
-                log.info("창고 수정 시작 - warehouseCode: {}, warehouseName: {}", 
-                        request.getWarehouseCode(), request.getWarehouseName());
+            } catch (Exception e) {
+                log.error("창고 저장 실패 - warehouseName: {}, 에러: {}", warehouse.getWarehouseName(), e.getMessage());
                 
-                Warehouse existingWarehouse = warehouseRepository.findByWarehouseCode(request.getWarehouseCode());
-                if (existingWarehouse == null) {
-                    log.warn("수정할 창고를 찾을 수 없습니다 - warehouseCode: {}", request.getWarehouseCode());
-                    return RespDto.fail("수정할 창고를 찾을 수 없습니다.");
-                }
+                WarehouseBatchResult.WarehouseErrorDto errorDto = WarehouseBatchResult.WarehouseErrorDto.builder()
+                        .warehouseCode(warehouse.getWarehouseCode())
+                        .warehouseName(warehouse.getWarehouseName())
+                        .errorMessage(e.getMessage())
+                        .build();
                 
-                request.updateEntity(existingWarehouse);
-                savedWarehouse = warehouseRepository.save(existingWarehouse);
-                action = "수정";
+                failData.add(errorDto);
             }
-            
-            // 간소화된 응답 생성
-            WarehouseSaveRespDto responseDto = WarehouseSaveRespDto.builder()
-                    .warehouseCode(savedWarehouse.getWarehouseCode())
-                    .build();
-            
-            log.info("창고 {} 완료 - warehouseCode: {}, warehouseName: {}, distCenterName: {}", 
-                    action, savedWarehouse.getWarehouseCode(), savedWarehouse.getWarehouseName(), 
-                    distCenter.getDistCenterName());
-            
-            return RespDto.success("창고가 성공적으로 " + action + "되었습니다.", responseDto);
-            
-        } catch (Exception e) {
-            log.error("창고 저장 중 오류 발생 - warehouseCode: {}", request.getWarehouseCode(), e);
-            return RespDto.fail("창고 저장 중 오류가 발생했습니다.");
         }
+        
+        // 배치 결과 생성
+        WarehouseBatchResult result = WarehouseBatchResult.builder()
+                .totalCount(reqDto.getWarehouses().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("창고 저장 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("창고 다중 저장 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getWarehouses().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
     }
     
     /**
-     * 창고 삭제 (하드 삭제)
-     * @param warehouseCode 창고코드
-     * @return 삭제 결과
+     * 개별 창고 저장 처리 (유효성 검증 추가)
      */
-    public RespDto<WarehouseDeleteRespDto> deleteWarehouse(Integer warehouseCode) {
-        try {
-            log.info("창고 삭제 시작 - warehouseCode: {}", warehouseCode);
-            
-            Warehouse warehouse = warehouseRepository.findByWarehouseCode(warehouseCode);
-            if (warehouse == null) {
-                log.warn("삭제할 창고를 찾을 수 없습니다 - warehouseCode: {}", warehouseCode);
-                return RespDto.fail("삭제할 창고를 찾을 수 없습니다.");
-            }
-            
-            // 창고에 품목이 있는지 확인
-            Long itemCount = warehouseItemsRepository.countByWarehouseCode(warehouseCode);
-            if (itemCount > 0) {
-                // 창고에 품목이 있으면 삭제 중단
-                log.warn("창고에 품목이 있어 삭제할 수 없습니다 - warehouseCode: {}, itemCount: {}", 
-                        warehouseCode, itemCount);
-                
-                WarehouseDeleteRespDto responseDto = WarehouseDeleteRespDto.builder()
-                        .warehouseCode(warehouseCode)
-                        .itemCount(itemCount)
-                        .message("창고에 품목이 들어있어 삭제할 수 없습니다. 현재 품목 개수: " + itemCount)
-                        .build();
-                
-                return RespDto.fail("창고에 품목이 들어있어 삭제할 수 없습니다. 현재 품목 개수: " + itemCount);
-            }
-            
-            // 하드 삭제 진행
-            warehouseRepository.delete(warehouse);
-            
-            // 응답 생성
-            WarehouseDeleteRespDto responseDto = WarehouseDeleteRespDto.builder()
-                    .warehouseCode(warehouseCode)
-                    .itemCount(0L)
-                    .message("창고가 성공적으로 삭제되었습니다.")
+    private WarehouseRespDto saveSingleWarehouse(WarehouseSaveReqDto.WarehouseItemDto warehouse) {
+        
+        // 1. 본사코드 존재 여부 확인
+        if (warehouseRepository.countByHqCode(warehouse.getHqCode()) == 0) {
+            throw new RuntimeException("존재하지 않는 본사코드입니다: " + warehouse.getHqCode());
+        }
+        
+        // 2. 물류센터코드 존재 여부 확인
+        if (warehouseRepository.countByDistCenterCode(warehouse.getDistCenterCode()) == 0) {
+            throw new RuntimeException("존재하지 않는 물류센터코드입니다: " + warehouse.getDistCenterCode());
+        }
+        
+        Warehouse warehouseEntity;
+        
+        if (warehouse.getWarehouseCode() == null) {
+            // 신규 등록
+            warehouseEntity = Warehouse.builder()
+                    .distCenterCode(warehouse.getDistCenterCode())
+                    .hqCode(warehouse.getHqCode())
+                    .warehouseName(warehouse.getWarehouseName())
+                    .zipCode(warehouse.getZipCode())
+                    .addr(warehouse.getAddr())
+                    .telNum(warehouse.getTelNum())
+                    .managerName(warehouse.getManagerName())
+                    .managerContact(warehouse.getManagerContact())
+                    .useYn(warehouse.getUseYn())
+                    .description(warehouse.getDescription())
                     .build();
             
-            log.info("창고 삭제 완료 - warehouseCode: {}, warehouseName: {}", 
-                    warehouseCode, warehouse.getWarehouseName());
+            warehouseEntity = warehouseRepository.save(warehouseEntity);
             
-            return RespDto.success("창고가 성공적으로 삭제되었습니다.", responseDto);
+            log.info("창고 신규 생성 - warehouseCode: {}, warehouseName: {}", 
+                    warehouseEntity.getWarehouseCode(), warehouseEntity.getWarehouseName());
             
+        } else {
+            // 수정
+            warehouseEntity = warehouseRepository.findById(warehouse.getWarehouseCode())
+                    .orElseThrow(() -> new RuntimeException("존재하지 않는 창고입니다: " + warehouse.getWarehouseCode()));
+            
+            // 모든 필드 수정
+            warehouseEntity.setDistCenterCode(warehouse.getDistCenterCode());
+            warehouseEntity.setWarehouseName(warehouse.getWarehouseName());
+            warehouseEntity.setZipCode(warehouse.getZipCode());
+            warehouseEntity.setAddr(warehouse.getAddr());
+            warehouseEntity.setTelNum(warehouse.getTelNum());
+            warehouseEntity.setManagerName(warehouse.getManagerName());
+            warehouseEntity.setManagerContact(warehouse.getManagerContact());
+            warehouseEntity.setUseYn(warehouse.getUseYn());
+            warehouseEntity.setDescription(warehouse.getDescription());
+            
+            warehouseEntity = warehouseRepository.save(warehouseEntity);
+            
+            log.info("창고 정보 수정 - warehouseCode: {}, warehouseName: {}", 
+                    warehouseEntity.getWarehouseCode(), warehouseEntity.getWarehouseName());
+        }
+        
+        return WarehouseRespDto.fromEntity(warehouseEntity);
+    }
+
+    /**
+     * 창고 다중 삭제 (Hard Delete)
+     */
+    @Transactional
+    public RespDto<WarehouseBatchResult> deleteWarehouses(WarehouseDeleteReqDto reqDto) {
+        
+        log.info("창고 다중 삭제 시작 - 총 {}건", reqDto.getWarehouseCodes().size());
+        
+        List<Integer> successCodes = new ArrayList<>();
+        List<WarehouseBatchResult.WarehouseErrorDto> failData = new ArrayList<>();
+        
+        for (Integer warehouseCode : reqDto.getWarehouseCodes()) {
+            try {
+                // 개별 창고 삭제 처리
+                deleteSingleWarehouse(warehouseCode);
+                successCodes.add(warehouseCode);
+                
+                log.info("창고 삭제 성공 - warehouseCode: {}", warehouseCode);
+                
+            } catch (Exception e) {
+                log.error("창고 삭제 실패 - warehouseCode: {}, 에러: {}", warehouseCode, e.getMessage());
+                
+                // 에러 시 창고명 조회 시도
+                String warehouseName = getWarehouseNameSafely(warehouseCode);
+                
+                WarehouseBatchResult.WarehouseErrorDto errorDto = WarehouseBatchResult.WarehouseErrorDto.builder()
+                        .warehouseCode(warehouseCode)
+                        .warehouseName(warehouseName)
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성 (삭제는 successData 대신 성공 코드만)
+        WarehouseBatchResult result = WarehouseBatchResult.builder()
+                .totalCount(reqDto.getWarehouseCodes().size())
+                .successCount(successCodes.size())
+                .failCount(failData.size())
+                .successData(successCodes.stream()
+                        .map(code -> WarehouseRespDto.builder().warehouseCode(code).build())
+                        .collect(Collectors.toList()))
+                .failData(failData)
+                .build();
+        
+        String message = String.format("창고 삭제 완료 - 성공: %d건, 실패: %d건", 
+                successCodes.size(), failData.size());
+        
+        log.info("창고 다중 삭제 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getWarehouseCodes().size(), successCodes.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 창고 삭제 처리 (재고 확인 추가)
+     */
+    private void deleteSingleWarehouse(Integer warehouseCode) {
+        
+        // 창고 존재 확인
+        Warehouse warehouse = warehouseRepository.findById(warehouseCode)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 창고입니다: " + warehouseCode));
+
+        // 창고에 재고가 있는 품목 확인
+        Long inventoryCount = warehouseRepository.countInventoryByWarehouseCode(warehouseCode);
+        if (inventoryCount > 0) {
+            throw new RuntimeException("창고에 재고가 있는 품목이 " + inventoryCount + "개 존재하여 삭제할 수 없습니다. 재고를 먼저 처리해주세요.");
+        }
+
+        // Hard Delete - 실제 레코드 삭제
+        warehouseRepository.delete(warehouse);
+        
+        log.info("창고 삭제 완료 - warehouseCode: {}, warehouseName: {}", 
+                warehouseCode, warehouse.getWarehouseName());
+    }
+    
+    /**
+     * 창고명 안전 조회 (에러 발생시 사용)
+     */
+    private String getWarehouseNameSafely(Integer warehouseCode) {
+        try {
+            return warehouseRepository.findById(warehouseCode)
+                    .map(Warehouse::getWarehouseName)
+                    .orElse("알 수 없음");
         } catch (Exception e) {
-            log.error("창고 삭제 중 오류 발생 - warehouseCode: {}", warehouseCode, e);
-            return RespDto.fail("창고 삭제 중 오류가 발생했습니다.");
+            return "조회 실패";
         }
     }
 }

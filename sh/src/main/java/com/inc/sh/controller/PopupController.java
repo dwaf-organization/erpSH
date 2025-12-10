@@ -54,21 +54,21 @@ public class PopupController {
     }
 
     /**
-     * 거래처 팝업 검색
+     * 거래처 팝업 검색 (수정됨 - hqCode 추가)
      * GET /api/v1/erp/popup/customer-search
      */
     @GetMapping("/customer-search")
     public ResponseEntity<RespDto<List<CustomerRespDto>>> searchCustomers(
-            @RequestParam(value = "customerCode", required = false) String customerCode,
-            @RequestParam(value = "customerName", required = false) String customerName,
-            @RequestParam(value = "brandCode", required = false) Integer brandCode) {
+            @RequestParam("hqCode") Integer hqCode,
+            @RequestParam(value = "customerSearch", required = false) String customerSearch,
+            @RequestParam(value = "brandCode", required = false) String brandCode) {
         
-        log.info("거래처 팝업 검색 요청 - customerCode: {}, customerName: {}, brandCode: {}", 
-                customerCode, customerName, brandCode);
+        log.info("거래처 팝업 검색 요청 - hqCode: {}, customerSearch: {}, brandCode: {}", 
+                hqCode, customerSearch, brandCode);
         
         CustomerSearchPopupDto searchDto = CustomerSearchPopupDto.builder()
-                .customerCode(customerCode)
-                .customerName(customerName)
+                .hqCode(hqCode)
+                .customerSearch(customerSearch)
                 .brandCode(brandCode)
                 .build();
         
@@ -82,22 +82,22 @@ public class PopupController {
     }
 
     /**
-     * 가상계좌 팝업 검색
+     * 가상계좌 팝업 검색 (수정됨 - hqCode 추가, 파라미터명 수정)
      * GET /api/v1/erp/popup/virtual-account-search
      */
     @GetMapping("/virtual-account-search")
     public ResponseEntity<RespDto<List<VirtualAccountRespDto>>> searchVirtualAccounts(
-            @RequestParam(value = "virtualAccountCode", required = false) String virtualAccountCode,
-            @RequestParam(value = "virtualAccount", required = false) String virtualAccount,
-            @RequestParam(value = "accountStatus", required = false) String accountStatus) {
+            @RequestParam("hqCode") Integer hqCode,
+            @RequestParam(value = "virtualAccountNum", required = false) String virtualAccountNum,
+            @RequestParam(value = "virtualAccountStatus", required = false) String virtualAccountStatus) {
         
-        log.info("가상계좌 팝업 검색 요청 - virtualAccountCode: {}, virtualAccount: {}, accountStatus: {}", 
-                virtualAccountCode, virtualAccount, accountStatus);
+        log.info("가상계좌 팝업 검색 요청 - hqCode: {}, virtualAccountNum: {}, virtualAccountStatus: {}", 
+                hqCode, virtualAccountNum, virtualAccountStatus);
         
         VirtualAccountSearchPopupDto searchDto = VirtualAccountSearchPopupDto.builder()
-                .virtualAccountCode(virtualAccountCode)
-                .virtualAccount(virtualAccount)
-                .accountStatus(accountStatus)
+                .hqCode(hqCode)
+                .virtualAccountNum(virtualAccountNum)
+                .virtualAccountStatus(virtualAccountStatus)
                 .build();
         
         RespDto<List<VirtualAccountRespDto>> response = popupService.searchVirtualAccounts(searchDto);

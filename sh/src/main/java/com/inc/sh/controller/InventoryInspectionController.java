@@ -1,7 +1,9 @@
 package com.inc.sh.controller;
 
+import com.inc.sh.dto.inventoryInspection.reqDto.InventoryInspectionSaveReqDto;
 import com.inc.sh.dto.inventoryInspection.reqDto.InventoryInspectionSearchDto;
 import com.inc.sh.dto.inventoryInspection.reqDto.InventoryInspectionUpdateDto;
+import com.inc.sh.dto.inventoryInspection.respDto.InventoryInspectionBatchResult;
 import com.inc.sh.dto.inventoryInspection.respDto.InventoryInspectionRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.service.InventoryInspectionService;
@@ -49,21 +51,34 @@ public class InventoryInspectionController {
     }
 
     /**
-     * 재고실사 수정
+     * 재고실사 다중 수정 (마감 상태 확인 포함)
      * PUT /api/v1/erp/inventory-inspection/update
      */
     @PutMapping("/update")
-    public ResponseEntity<RespDto<String>> updateInventoryInspection(@RequestBody InventoryInspectionUpdateDto updateDto) {
+    public ResponseEntity<RespDto<InventoryInspectionBatchResult>> updateInventoryInspections(@RequestBody InventoryInspectionSaveReqDto request) {
         
-        log.info("재고실사 수정 요청 - 마감코드: {}, 실사수량: {}, 실사단가: {}", 
-                updateDto.getClosingCode(), updateDto.getActualQuantity(), updateDto.getActualUnitPrice());
+        log.info("재고실사 다중 수정 요청 - 총 {}건", 
+                request.getUpdates() != null ? request.getUpdates().size() : 0);
         
-        RespDto<String> response = inventoryInspectionService.updateInventoryInspection(updateDto);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getUpdates() == null || request.getUpdates().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("수정할 재고실사 데이터가 없습니다."));
         }
+        
+        // 개별 항목 필수 필드 검증
+        for (InventoryInspectionSaveReqDto.InventoryInspectionItemDto update : request.getUpdates()) {
+            if (update.getClosingCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("마감코드는 필수입니다."));
+            }
+            if (update.getActualQuantity() == null && update.getActualUnitPrice() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("실사수량 또는 실사단가 중 하나는 필수입니다."));
+            }
+        }
+        
+        RespDto<InventoryInspectionBatchResult> response = inventoryInspectionService.updateInventoryInspections(request);
+        return ResponseEntity.ok(response);
     }
 }

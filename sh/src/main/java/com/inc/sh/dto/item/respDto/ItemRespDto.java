@@ -34,6 +34,7 @@ public class ItemRespDto {
     private String deadlineTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String categoryName;
     
     /**
      * Entity to DTO 변환
@@ -60,8 +61,16 @@ public class ItemRespDto {
                 .maxOrderQty(item.getMaxOrderQty())
                 .deadlineDay(item.getDeadlineDay())
                 .deadlineTime(item.getDeadlineTime())
-                .createdAt(item.getCreatedAt())
-                .updatedAt(item.getUpdatedAt())
+                .categoryName(null)
                 .build();
+    }
+    
+    /**
+     * Entity를 DTO로 변환하고 categoryName 설정
+     */
+    public static ItemRespDto fromEntityWithCategoryName(Item item, String categoryName) {
+        ItemRespDto dto = fromEntity(item);
+        dto.setCategoryName(categoryName);
+        return dto;
     }
 }

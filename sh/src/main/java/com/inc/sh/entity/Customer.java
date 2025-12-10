@@ -64,8 +64,7 @@ public class Customer {
     private String faxNum; // 부가세여부 (스키마상 fax_num이지만 실제 의미는 부가세여부)
     
     @Column(name = "tax_invoice_yn", nullable = false)
-    @Builder.Default
-    private Integer taxInvoiceYn = 0; // 0=미발행, 1=발행
+    private String taxInvoiceYn; // Y=발행, N=발행
     
     @Column(name = "tax_invoice_name", length = 250)
     private String taxInvoiceName;

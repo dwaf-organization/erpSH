@@ -2,7 +2,9 @@ package com.inc.sh.controller;
 
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.brand.reqDto.BrandReqDto;
+import com.inc.sh.dto.brand.reqDto.BrandSaveReqDto;
 import com.inc.sh.dto.brand.reqDto.BrandDeleteReqDto;
+import com.inc.sh.dto.brand.respDto.BrandBatchResult;
 import com.inc.sh.dto.brand.respDto.BrandRespDto;
 import com.inc.sh.service.BrandService;
 import lombok.RequiredArgsConstructor;
@@ -36,16 +38,22 @@ public class BrandController {
     }
 
     /**
-     * 브랜드 저장 (신규/수정)
+     * 브랜드 다중 저장 (신규/수정)
      * POST /api/v1/erp/brand/save
      */
     @PostMapping("/save")
-    public ResponseEntity<RespDto<BrandRespDto>> saveBrand(@RequestBody BrandReqDto request) {
+    public ResponseEntity<RespDto<BrandBatchResult>> saveBrand(@RequestBody BrandSaveReqDto request) {
         
-        log.info("브랜드 저장 요청 - brandCode: {}, brandName: {}", 
-                request.getBrandCode(), request.getBrandName());
+        log.info("브랜드 다중 저장 요청 - 총 {}건", 
+                request.getBrands() != null ? request.getBrands().size() : 0);
         
-        RespDto<BrandRespDto> response = brandService.saveBrand(request);
+        // 요청 데이터 검증
+        if (request.getBrands() == null || request.getBrands().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 브랜드 데이터가 없습니다."));
+        }
+        
+        RespDto<BrandBatchResult> response = brandService.saveBrands(request);
         return ResponseEntity.ok(response);
     }
 

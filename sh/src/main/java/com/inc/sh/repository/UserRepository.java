@@ -27,6 +27,16 @@ public interface UserRepository extends JpaRepository<User, String> {
     boolean existsByUserCode(@Param("userCode") String userCode);
     
     /**
+     * 특정 prefix로 시작하는 마지막 사용자 코드 조회 (YYMM+hqCode+001 형태용)
+     */
+    @Query(value = "SELECT u.user_code " +
+           "FROM user u " +
+           "WHERE u.user_code LIKE CONCAT(:prefix, '%') " +
+           "ORDER BY u.user_code DESC " +
+           "LIMIT 1", nativeQuery = true)
+    String findLastUserCodeByPrefix(@Param("prefix") String prefix);
+    
+    /**
      * 사용자 검색 조회 (권한명 포함)
      */
     @Query(value = "SELECT " +

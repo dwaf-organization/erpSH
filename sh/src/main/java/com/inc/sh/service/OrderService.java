@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,97 +34,175 @@ public class OrderService {
     private final WarehouseItemsRepository warehouseItemsRepository;
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
-    
     /**
-     * 주문 저장 (신규/수정)
+     * 주문 다중 저장 (신규/수정)
      */
     @Transactional
-    public RespDto<String> saveOrder(OrderSaveDto saveDto) {
-        try {
-            log.info("주문 저장 시작 - orderNo: {}, customerCode: {}", 
-                    saveDto.getOrderNo(), saveDto.getCustomerCode());
-
-            // 1. 거래처 정보 조회
-            Customer customer = customerRepository.findByCustomerCode(saveDto.getCustomerCode());
-            if (customer == null) {
-                return RespDto.fail("존재하지 않는 거래처입니다.");
-            }
-
-            // 2. 배송휴일 체크
-            RespDto<String> holidayCheck = checkDeliveryHoliday(saveDto.getDeliveryRequestDt(), customer.getBrandCode());
-            if (holidayCheck.getCode() != 1) {
-                return holidayCheck;
-            }
-
-            // 3. 배송요일 체크
-            RespDto<String> dayCheck = checkDeliveryDay(saveDto.getDeliveryRequestDt(), customer.getDeliveryWeekday());
-            if (dayCheck.getCode() != 1) {
-                return dayCheck;
-            }
-
-            // 4. 주문시간 제한 체크
-            RespDto<String> timeCheck = checkOrderTimeLimit(customer.getBrandCode());
-            if (timeCheck.getCode() != 1) {
-                return timeCheck;
-            }
-
-            String orderNo;
-            
-            if (saveDto.getOrderNo() == null || saveDto.getOrderNo().trim().isEmpty()) {
-                // 신규 주문 생성
-                orderNo = generateOrderNo();
+    public RespDto<OrderBatchResult> saveOrders(OrderSaveReqDto reqDto) {
+        
+        log.info("주문 다중 저장 시작 - 총 {}건", reqDto.getOrders().size());
+        
+        List<OrderRespDto> successData = new ArrayList<>();
+        List<OrderBatchResult.OrderErrorDto> failData = new ArrayList<>();
+        
+        for (OrderSaveReqDto.OrderSaveItemDto order : reqDto.getOrders()) {
+            try {
+                // 개별 주문 저장 처리
+                OrderRespDto savedOrder = saveSingleOrder(order);
+                successData.add(savedOrder);
                 
-                Order newOrder = Order.builder()
-                        .orderNo(orderNo)
-                        .customerCode(saveDto.getCustomerCode())
-                        .vehicleCode(saveDto.getVehicleCode())
-                        .distCenterCode(saveDto.getDistCenterCode())
-                        .customerName(customer.getCustomerName())
-                        .bizNum(customer.getBizNum())
-                        .addr(customer.getAddr())
-                        .ownerName(customer.getOwnerName())
-                        .telNum(customer.getTelNum())
-                        .orderDt(saveDto.getOrderDt())
-                        .deliveryRequestDt(saveDto.getDeliveryRequestDt())
-                        .deliveryAmt(saveDto.getDeliveryAmt())
-                        .deliveryStatus(saveDto.getDeliveryStatus())
-                        .paymentStatus("결제대기")
-                        .depositTypeCode(customer.getDepositTypeCode())
-                        .orderMessage(saveDto.getOrderMessage())
-                        .taxableAmt(0)
-                        .taxFreeAmt(0)
-                        .supplyAmt(0)
-                        .vatAmt(0)
-                        .totalAmt(0)
-                        .totalQty(0)
+                log.info("주문 저장 성공 - orderNo: {}, customerCode: {}", 
+                        savedOrder.getOrderNo(), savedOrder.getCustomerCode());
+                
+            } catch (Exception e) {
+                log.error("주문 저장 실패 - customerCode: {}, 에러: {}", order.getCustomerCode(), e.getMessage());
+                
+                // 에러 시 거래처명 조회 시도
+                String customerName = getCustomerNameSafely(order.getCustomerCode());
+                
+                OrderBatchResult.OrderErrorDto errorDto = OrderBatchResult.OrderErrorDto.builder()
+                        .orderNo(order.getOrderNo())
+                        .customerName(customerName)
+                        .errorMessage(e.getMessage())
                         .build();
                 
-                orderRepository.save(newOrder);
-                
-            } else {
-                // 기존 주문 수정
-                orderNo = saveDto.getOrderNo();
-                Order existingOrder = orderRepository.findByOrderNo(orderNo);
-                if (existingOrder == null) {
-                    return RespDto.fail("존재하지 않는 주문입니다.");
-                }
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성
+        OrderBatchResult result = OrderBatchResult.builder()
+                .totalCount(reqDto.getOrders().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("주문 저장 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("주문 다중 저장 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getOrders().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 주문 저장 처리 (기존 검증 로직 포함)
+     */
+    private OrderRespDto saveSingleOrder(OrderSaveReqDto.OrderSaveItemDto saveDto) {
+        
+        // 1. 거래처 정보 조회 및 검증
+        Customer customer = customerRepository.findByCustomerCode(saveDto.getCustomerCode());
+        if (customer == null) {
+            throw new RuntimeException("존재하지 않는 거래처입니다: " + saveDto.getCustomerCode());
+        }
 
-                existingOrder.setDeliveryRequestDt(saveDto.getDeliveryRequestDt());
-                existingOrder.setDeliveryStatus(saveDto.getDeliveryStatus());
-                existingOrder.setDeliveryAmt(saveDto.getDeliveryAmt());
-                existingOrder.setOrderMessage(saveDto.getOrderMessage());
-                
-                orderRepository.save(existingOrder);
+        // 2. 배송휴일 체크
+        List<DeliveryHoliday> holidays = deliveryHolidayRepository.findByBrandCodeAndHolidayDt(
+                customer.getBrandCode(), saveDto.getDeliveryRequestDt());
+        if (holidays != null && !holidays.isEmpty()) {
+            throw new RuntimeException("해당 날짜는 배송휴일입니다. 다른 날짜를 선택해주세요.");
+        }
+
+        // 3. 배송요일 체크
+        LocalDate date = LocalDate.parse(saveDto.getDeliveryRequestDt(), DateTimeFormatter.ofPattern("yyyyMMdd"));
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        int dayIndex = (dayOfWeek.getValue() % 7); // 일=0, 월=1, ..., 토=6
+        
+        if (customer.getDeliveryWeekday().length() != 7 || customer.getDeliveryWeekday().charAt(dayIndex) != '1') {
+            throw new RuntimeException("해당 요일은 배송이 불가능합니다. 다른 날짜를 선택해주세요.");
+        }
+
+        // 4. 주문시간 제한 체크
+        LocalDateTime now = LocalDateTime.now();
+        String currentTime = now.format(DateTimeFormatter.ofPattern("HH:mm"));
+        String[] dayNames = {"월", "화", "수", "목", "금", "토", "일"};
+        int dayIdx = now.getDayOfWeek().getValue() - 1;
+        if (now.getDayOfWeek() == DayOfWeek.SUNDAY) dayIdx = 6;
+        String today = dayNames[dayIdx];
+        
+        List<OrderLimitSet> limits = orderLimitSetRepository.findByBrandCodeAndDayName(customer.getBrandCode(), today);
+        for (OrderLimitSet limit : limits) {
+            if (isTimeInRange(currentTime, limit.getLimitStartTime(), limit.getLimitEndTime())) {
+                throw new RuntimeException("주문 제한 시간입니다. " + limit.getLimitStartTime() + "~" + limit.getLimitEndTime() + " 시간에는 주문할 수 없습니다.");
+            }
+        }
+
+        // 5. 충전형 주문시 잔액 확인
+        if (saveDto.getDepositTypeCode() != null && saveDto.getDepositTypeCode() == 1 && saveDto.getTotalAmt() != null) {
+            if (customer.getBalanceAmt() < saveDto.getTotalAmt()) {
+                throw new RuntimeException("잔액이 부족합니다. 현재 잔액: " + customer.getBalanceAmt() + "원, 주문금액: " + saveDto.getTotalAmt() + "원");
+            }
+        }
+
+        String orderNo;
+        Order orderEntity;
+        
+        if (saveDto.getOrderNo() == null || saveDto.getOrderNo().trim().isEmpty()) {
+            // 신규 주문 생성
+            orderNo = generateOrderNo();
+            
+            orderEntity = Order.builder()
+                    .orderNo(orderNo)
+                    .customerCode(saveDto.getCustomerCode())
+                    .vehicleCode(saveDto.getVehicleCode())
+                    .distCenterCode(saveDto.getDistCenterCode())
+                    .customerName(customer.getCustomerName())
+                    .bizNum(customer.getBizNum())
+                    .addr(customer.getAddr())
+                    .ownerName(customer.getOwnerName())
+                    .telNum(customer.getTelNum())
+                    .orderDt(saveDto.getOrderDt())
+                    .deliveryRequestDt(saveDto.getDeliveryRequestDt())
+                    .deliveryAmt(saveDto.getDeliveryAmt())
+                    .deliveryStatus(saveDto.getDeliveryStatus())
+                    .paymentStatus("결제대기")
+                    .depositTypeCode(customer.getDepositTypeCode())
+                    .orderMessage(saveDto.getOrderMessage())
+                    .taxableAmt(0)
+                    .taxFreeAmt(0)
+                    .supplyAmt(0)
+                    .vatAmt(0)
+                    .totalAmt(0)
+                    .totalQty(0)
+                    .build();
+            
+            orderEntity = orderRepository.save(orderEntity);
+            
+            log.info("주문 신규 생성 - orderNo: {}, customerName: {}", orderNo, customer.getCustomerName());
+            
+        } else {
+            // 주문 수정
+            orderEntity = orderRepository.findByOrderNo(saveDto.getOrderNo());
+            if (orderEntity == null) {
+                throw new RuntimeException("존재하지 않는 주문입니다: " + saveDto.getOrderNo());
             }
             
-            return RespDto.success("주문이 저장되었습니다.", orderNo);
-
-        } catch (Exception e) {
-            log.error("주문 저장 중 오류 발생", e);
-            return RespDto.fail("주문 저장 중 오류가 발생했습니다.");
+            // 배송요청 상태에서만 수정 가능
+            if (!"배송요청".equals(orderEntity.getDeliveryStatus())) {
+                throw new RuntimeException("배송요청 상태의 주문만 수정할 수 있습니다.");
+            }
+            
+            // 주문 정보 수정
+            orderEntity.setDeliveryRequestDt(saveDto.getDeliveryRequestDt());
+            orderEntity.setOrderMessage(saveDto.getOrderMessage());
+            orderEntity.setDeliveryAmt(saveDto.getDeliveryAmt());
+            orderEntity.setDeliveryStatus(saveDto.getDeliveryStatus());
+            
+            if (saveDto.getVehicleCode() != null) {
+                orderEntity.setVehicleCode(saveDto.getVehicleCode());
+            }
+            
+            orderEntity = orderRepository.save(orderEntity);
+            orderNo = orderEntity.getOrderNo();
+            
+            log.info("주문 정보 수정 - orderNo: {}, customerName: {}", orderNo, customer.getCustomerName());
         }
+        
+        return OrderRespDto.fromEntity(orderEntity);
     }
-
     /**
      * 주문품목 업데이트 (orderItemCode 기반 생성/수정)
      */
@@ -432,87 +511,133 @@ public class OrderService {
         }
     }
 
+
     /**
-     * 주문 삭제 (주문취소)
+     * 주문 다중 삭제 (Hard Delete + 기존 검증 로직)
      */
     @Transactional
-    public RespDto<String> deleteOrder(String orderNo) {
-        try {
-            log.info("주문 삭제 시작 - orderNo: {}", orderNo);
-            
-            // 주문 존재 확인
-            Order order = orderRepository.findByOrderNo(orderNo);
-            if (order == null) {
-                return RespDto.fail("존재하지 않는 주문입니다.");
-            }
-            
-            // 배송요청 상태에서만 삭제 가능
-            if (!"배송요청".equals(order.getDeliveryStatus())) {
-                return RespDto.fail("배송요청 상태의 주문만 삭제할 수 있습니다.");
-            }
-            
-            // 충전형인 경우 전액 환불 처리
-            if (order.getDepositTypeCode() == 1) {
-                Customer customer = customerRepository.findByCustomerCode(order.getCustomerCode());
+    public RespDto<OrderBatchResult> deleteOrders(OrderDeleteReqDto reqDto) {
+        
+        log.info("주문 다중 삭제 시작 - 총 {}건", reqDto.getOrderNos().size());
+        
+        List<String> successOrderNos = new ArrayList<>();
+        List<OrderBatchResult.OrderErrorDto> failData = new ArrayList<>();
+        
+        for (String orderNo : reqDto.getOrderNos()) {
+            try {
+                // 개별 주문 삭제 처리
+                deleteSingleOrder(orderNo);
+                successOrderNos.add(orderNo);
                 
-                // 1. 기존 주문 관련 거래내역 총액 계산 (환불할 금액)
-                List<CustomerAccountTransactions> existingTransactions = customerAccountTransactionsRepository
-                        .findByReferenceId(orderNo);
+                log.info("주문 삭제 성공 - orderNo: {}", orderNo);
                 
-                Integer totalRefundAmount = existingTransactions.stream()
-                        .filter(t -> "주문".equals(t.getReferenceType()) || "주문품목수정".equals(t.getReferenceType()))
-                        .mapToInt(t -> {
-                            // 출금은 환불 대상, 입금은 차감
-                            if ("출금".equals(t.getTransactionType())) {
-                                return t.getAmount();
-                            } else if ("입금".equals(t.getTransactionType())) {
-                                return -t.getAmount();
-                            }
-                            return 0;
-                        })
-                        .sum();
+            } catch (Exception e) {
+                log.error("주문 삭제 실패 - orderNo: {}, 에러: {}", orderNo, e.getMessage());
                 
-                // 2. 환불할 금액이 있는 경우에만 거래내역 생성
-                if (totalRefundAmount > 0) {
-                    // 잔액 증가 (환불)
-                    customer.setBalanceAmt(customer.getBalanceAmt() + totalRefundAmount);
-                    customerRepository.save(customer);
-                    
-                    // 주문취소 거래내역 생성
-                    CustomerAccountTransactions cancelTransaction = CustomerAccountTransactions.builder()
-                            .customerCode(customer.getCustomerCode())
-                            .virtualAccountCode(customer.getVirtualAccountCode())
-                            .transactionDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")))
-                            .transactionType("입금")
-                            .amount(totalRefundAmount)
-                            .balanceAfter(customer.getBalanceAmt())
-                            .referenceType("주문취소")
-                            .referenceId(orderNo)
-                            .note("주문취소 - 전액환불 (" + totalRefundAmount + "원)")
-                            .build();
-                    
-                    customerAccountTransactionsRepository.save(cancelTransaction);
-                    
-                    log.info("주문취소 환불 처리 완료 - 환불금액: {}, 잔액: {}", totalRefundAmount, customer.getBalanceAmt());
-                }
+                // 에러 시 거래처명 조회 시도
+                String customerName = getCustomerNameByOrderNoSafely(orderNo);
+                
+                OrderBatchResult.OrderErrorDto errorDto = OrderBatchResult.OrderErrorDto.builder()
+                        .orderNo(orderNo)
+                        .customerName(customerName)
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
             }
-            
-            // 주문품목 먼저 삭제
-            orderItemRepository.deleteByOrderNo(orderNo);
-            log.info("주문품목 삭제 완료 - orderNo: {}", orderNo);
-            
-            // 주문 삭제
-            orderRepository.deleteById(orderNo);
-            log.info("주문 삭제 완료 - orderNo: {}", orderNo);
-            
-            return RespDto.success("주문이 취소되었습니다.", null);
-            
-        } catch (Exception e) {
-            log.error("주문 삭제 중 오류 발생", e);
-            return RespDto.fail("주문 삭제 중 오류가 발생했습니다.");
         }
+        
+        // 배치 결과 생성 (삭제는 successData 대신 성공 주문번호만)
+        OrderBatchResult result = OrderBatchResult.builder()
+                .totalCount(reqDto.getOrderNos().size())
+                .successCount(successOrderNos.size())
+                .failCount(failData.size())
+                .successData(successOrderNos.stream()
+                        .map(orderNo -> OrderRespDto.builder().orderNo(orderNo).build())
+                        .collect(Collectors.toList()))
+                .failData(failData)
+                .build();
+        
+        String message = String.format("주문 삭제 완료 - 성공: %d건, 실패: %d건", 
+                successOrderNos.size(), failData.size());
+        
+        log.info("주문 다중 삭제 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getOrderNos().size(), successOrderNos.size(), failData.size());
+        
+        return RespDto.success(message, result);
     }
-
+    
+    /**
+     * 개별 주문 삭제 처리 (기존 검증 로직 포함)
+     */
+    private void deleteSingleOrder(String orderNo) {
+        
+        // 주문 존재 확인
+        Order order = orderRepository.findByOrderNo(orderNo);
+        if (order == null) {
+            throw new RuntimeException("존재하지 않는 주문입니다: " + orderNo);
+        }
+        
+        // 배송요청 상태에서만 삭제 가능
+        if (!"배송요청".equals(order.getDeliveryStatus())) {
+            throw new RuntimeException("배송요청 상태의 주문만 삭제할 수 있습니다. 현재 상태: " + order.getDeliveryStatus());
+        }
+        
+        // 충전형인 경우 전액 환불 처리
+        if (order.getDepositTypeCode() == 1) {
+            Customer customer = customerRepository.findByCustomerCode(order.getCustomerCode());
+            
+            // 기존 주문 관련 거래내역 총액 계산 (환불할 금액)
+            List<CustomerAccountTransactions> existingTransactions = customerAccountTransactionsRepository
+                    .findByReferenceId(orderNo);
+            
+            Integer totalRefundAmount = existingTransactions.stream()
+                    .filter(t -> "주문".equals(t.getReferenceType()) || "주문품목수정".equals(t.getReferenceType()))
+                    .mapToInt(t -> {
+                        // 출금은 환불 대상, 입금은 차감
+                        if ("출금".equals(t.getTransactionType())) {
+                            return t.getAmount();
+                        } else if ("입금".equals(t.getTransactionType())) {
+                            return -t.getAmount();
+                        }
+                        return 0;
+                    })
+                    .sum();
+            
+            // 환불할 금액이 있는 경우에만 거래내역 생성
+            if (totalRefundAmount > 0) {
+                // 잔액 증가 (환불)
+                customer.setBalanceAmt(customer.getBalanceAmt() + totalRefundAmount);
+                customerRepository.save(customer);
+                
+                // 주문취소 거래내역 생성
+                CustomerAccountTransactions cancelTransaction = CustomerAccountTransactions.builder()
+                        .customerCode(customer.getCustomerCode())
+                        .virtualAccountCode(customer.getVirtualAccountCode())
+                        .transactionDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")))
+                        .transactionType("입금")
+                        .amount(totalRefundAmount)
+                        .balanceAfter(customer.getBalanceAmt())
+                        .referenceType("주문취소")
+                        .referenceId(orderNo)
+                        .note("주문취소 - 전액환불 (" + totalRefundAmount + "원)")
+                        .build();
+                
+                customerAccountTransactionsRepository.save(cancelTransaction);
+                
+                log.info("주문취소 환불 처리 완료 - 환불금액: {}, 잔액: {}", totalRefundAmount, customer.getBalanceAmt());
+            }
+        }
+        
+        // 주문품목 먼저 삭제
+        orderItemRepository.deleteByOrderNo(orderNo);
+        log.info("주문품목 삭제 완료 - orderNo: {}", orderNo);
+        
+        // 주문 삭제 (Hard Delete)
+        orderRepository.deleteById(orderNo);
+        log.info("주문 삭제 완료 - orderNo: {}", orderNo);
+    }
+    
     /**
      * 주문품목 삭제
      */
@@ -531,6 +656,31 @@ public class OrderService {
         }
     }
 
+    /**
+     * 거래처명 안전 조회 (에러 발생시 사용)
+     */
+    private String getCustomerNameSafely(Integer customerCode) {
+        try {
+            Customer customer = customerRepository.findByCustomerCode(customerCode);
+            return customer != null ? customer.getCustomerName() : "알 수 없음";
+        } catch (Exception e) {
+            return "조회 실패";
+        }
+    }
+
+    /**
+     * 주문번호로 거래처명 안전 조회 (에러 발생시 사용)
+     */
+    private String getCustomerNameByOrderNoSafely(String orderNo) {
+        try {
+            Order order = orderRepository.findByOrderNo(orderNo);
+            return order != null ? order.getCustomerName() : "알 수 없음";
+        } catch (Exception e) {
+            return "조회 실패";
+        }
+    }
+    
+    
     /**
      * 배송휴일 체크
      */

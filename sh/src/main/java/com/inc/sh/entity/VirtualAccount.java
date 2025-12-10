@@ -5,7 +5,9 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "virtual_account")
@@ -66,4 +68,18 @@ public class VirtualAccount {
     @JoinColumn(name = "linked_customer_code", insertable = false, updatable = false)
     private Customer customer;
     */
+    @PrePersist
+    public void prePersist() {
+        if (this.openDt == null) {
+            this.openDt = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
+    
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

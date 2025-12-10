@@ -1,20 +1,25 @@
 package com.inc.sh.dto.deliveryPrice.reqDto;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import java.util.List;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class DeliveryPriceUpdateReqDto {
     
-    @NotNull(message = "품목코드는 필수입니다")
-    private Integer itemCode;
+    private List<DeliveryPriceItemDto> items;  // 납품단가 배열
     
-    @NotNull(message = "기본단가는 필수입니다")
-    @Positive(message = "기본단가는 0보다 큰 값이어야 합니다")
-    private Integer basePrice;
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class DeliveryPriceItemDto {
+        private Integer itemCode;       // 품목코드 (필수)
+        private Integer basePrice;      // 새로운 기본단가 (필수)
+    }
 }

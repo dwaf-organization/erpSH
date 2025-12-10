@@ -37,23 +37,24 @@ public class OrderLimitService {
     @Transactional(readOnly = true)
     public RespDto<List<ItemForOrderLimitRespDto>> getItemListForOrderLimit(OrderLimitSearchDto searchDto) {
         try {
-            log.info("주문제한 설정 품목 조회 시작 - categoryCode: {}, itemName: {}", 
-                    searchDto.getCategoryCode(), searchDto.getItemName());
+            log.info("주문제한 설정 품목 조회 시작 - categoryCode: {}, itemName: {}, hqCode: {}", 
+                    searchDto.getCategoryCode(), searchDto.getItemName(), searchDto.getHqCode());
             
-            List<Item> items = itemRepository.findForOrderLimitManagement(
+            List<Item> items = itemRepository.findForOrderLimitManagementWithHqCode(
                     searchDto.getCategoryCode(),
-                    searchDto.getItemName()
+                    searchDto.getItemName(),
+                    searchDto.getHqCode()
             );
             
             List<ItemForOrderLimitRespDto> responseList = items.stream()
                     .map(ItemForOrderLimitRespDto::fromEntity)
                     .collect(Collectors.toList());
             
-            log.info("주문제한 설정 품목 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("주문제한 설정 품목 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("품목 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("주문제한 설정 품목 조회 중 오류 발생", e);
+            log.error("주문제한 설정 품목 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("품목 목록 조회 중 오류가 발생했습니다.");
         }
     }
@@ -61,12 +62,13 @@ public class OrderLimitService {
     /**
      * 품목별 거래처 제한 정보 조회
      * @param itemCode 품목코드
+     * @param hqCode 본사코드
      * @return 거래처별 제한 정보
      */
     @Transactional(readOnly = true)
-    public RespDto<List<CustomerLimitRespDto>> getCustomerLimitsByItem(Integer itemCode) {
+    public RespDto<List<CustomerLimitRespDto>> getCustomerLimitsByItem(Integer itemCode, Integer hqCode) {
         try {
-            log.info("품목별 거래처 제한 정보 조회 시작 - itemCode: {}", itemCode);
+            log.info("품목별 거래처 제한 정보 조회 시작 - itemCode: {}, hqCode: {}", itemCode, hqCode);
             
             // 품목 존재 확인
             Item item = itemRepository.findByItemCode(itemCode);
@@ -75,8 +77,8 @@ public class OrderLimitService {
                 return RespDto.fail("품목을 찾을 수 없습니다.");
             }
             
-            // 활성 거래처 조회 (브랜드명 포함)
-            List<Object[]> activeCustomers = customerRepository.findActiveCustomersWithBrandForOrderLimit();
+            // 활성 거래처 조회 (브랜드명 포함, 본사별)
+            List<Object[]> activeCustomers = customerRepository.findActiveCustomersWithBrandForOrderLimitByHqCode(hqCode);
             
             // 해당 품목에 대한 제한된 거래처 조회
             List<Integer> limitedCustomerCodes = orderLimitCustomerRepository.findCustomerCodesByItemCode(itemCode);
@@ -90,12 +92,12 @@ public class OrderLimitService {
                     ))
                     .collect(Collectors.toList());
             
-            log.info("품목별 거래처 제한 정보 조회 완료 - itemCode: {}, 거래처 수: {}, 제한된 거래처 수: {}", 
-                    itemCode, responseList.size(), limitedCustomerCodes.size());
+            log.info("품목별 거래처 제한 정보 조회 완료 - itemCode: {}, hqCode: {}, 거래처 수: {}, 제한된 거래처 수: {}", 
+                    itemCode, hqCode, responseList.size(), limitedCustomerCodes.size());
             return RespDto.success("거래처 제한 정보 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("품목별 거래처 제한 정보 조회 중 오류 발생 - itemCode: {}", itemCode, e);
+            log.error("품목별 거래처 제한 정보 조회 중 오류 발생 - itemCode: {}, hqCode: {}", itemCode, hqCode, e);
             return RespDto.fail("거래처 제한 정보 조회 중 오류가 발생했습니다.");
         }
     }

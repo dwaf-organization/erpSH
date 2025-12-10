@@ -81,7 +81,26 @@ public class SettingService {
     }
     
     /**
-     * 주문 제한 설정 목록 조회
+     * 주문 제한 설정 목록 조회 (브랜드코드 + 본사코드)
+     */
+    @Transactional(readOnly = true)
+    public RespDto<List<OrderLimitRespDto>> getOrderLimitListByBrandCodeAndHqCode(Integer brandCode, Integer hqCode) {
+        
+        List<OrderLimitSet> entityList = orderLimitSetRepository.findByBrandCodeAndHqCode(brandCode, hqCode);
+        
+        List<OrderLimitRespDto> respDtoList = entityList.stream()
+                .map(OrderLimitRespDto::fromEntity)
+                .collect(Collectors.toList());
+        
+        if (respDtoList.isEmpty()) {
+            return RespDto.fail("해당 브랜드 코드(" + brandCode + "), 본사 코드(" + hqCode + ")에 설정된 주문 제한 정보가 없습니다.");
+        }
+        
+        return RespDto.success("주문 제한 설정 목록 조회 성공", respDtoList);
+    }
+    
+    /**
+     * 주문 제한 설정 목록 조회 (기존 메소드 - 브랜드코드만)
      */
     @Transactional(readOnly = true)
     public RespDto<List<OrderLimitRespDto>> getOrderLimitListByBrandCode(Integer brandCode) {

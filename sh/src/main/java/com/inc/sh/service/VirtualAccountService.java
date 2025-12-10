@@ -1,10 +1,13 @@
 package com.inc.sh.service;
 
+import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountDeleteReqDto;
 import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountReqDto;
+import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountSaveReqDto;
 import com.inc.sh.dto.virtualAccount.reqDto.VirtualAccountSearchDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountRespDto;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountSaveRespDto;
+import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountBatchResult;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountDeleteRespDto;
 import com.inc.sh.entity.VirtualAccount;
 import com.inc.sh.repository.VirtualAccountRepository;
@@ -14,6 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,32 +33,42 @@ public class VirtualAccountService {
     private final CustomerRepository customerRepository;
     
     /**
-     * 가상계좌 조회 (검색 조건)
-     * @param searchDto 검색 조건
-     * @return 조회된 가상계좌 목록
+     * 가상계좌 목록 조회 (거래처명 포함)
      */
-    @Transactional(readOnly = true)
-    public RespDto<List<VirtualAccountRespDto>> getVirtualAccountList(VirtualAccountSearchDto searchDto) {
+    public RespDto<List<VirtualAccountRespDto>> getVirtualAccountList(
+            Integer hqCode, Integer linkedCustomerCode, String virtualAccountStatus, String closeDtYn) {
         try {
-            log.info("가상계좌 목록 조회 시작 - linkedCustomerCode: {}, virtualAccountStatus: {}, closeDtYn: {}", 
-                    searchDto.getLinkedCustomerCode(), searchDto.getVirtualAccountStatus(), searchDto.getCloseDtYn());
+            log.info("가상계좌 목록 조회 시작 - hqCode: {}, linkedCustomerCode: {}, virtualAccountStatus: {}, closeDtYn: {}", 
+                    hqCode, linkedCustomerCode, virtualAccountStatus, closeDtYn);
             
-            List<VirtualAccount> virtualAccounts = virtualAccountRepository.findBySearchConditions(
-                    searchDto.getLinkedCustomerCode(),
-                    searchDto.getVirtualAccountStatus(),
-                    searchDto.getCloseDtYn()
-            );
+            // hqCode 필수 체크
+            if (hqCode == null) {
+                return RespDto.fail("본사코드는 필수 파라미터입니다.");
+            }
             
-            List<VirtualAccountRespDto> responseList = virtualAccounts.stream()
-                    .map(VirtualAccountRespDto::fromEntity)
-                    .collect(Collectors.toList());
+            // 조인 쿼리 실행 (VirtualAccount + Customer 조인)
+            List<Object[]> results = virtualAccountRepository.findBySearchConditionsWithJoin(
+                    hqCode, linkedCustomerCode, virtualAccountStatus, closeDtYn);
+            
+            // Object[] 결과를 VirtualAccountRespDto로 변환
+            List<VirtualAccountRespDto> responseList = new ArrayList<>();
+            
+            for (Object[] result : results) {
+                try {
+                    VirtualAccountRespDto virtualAccountDto = VirtualAccountRespDto.fromObjectArrayWithJoin(result);
+                    responseList.add(virtualAccountDto);
+                    
+                } catch (Exception e) {
+                    log.error("가상계좌 데이터 변환 중 오류 발생 - virtualAccountCode: {}, error: {}", result[0], e.getMessage());
+                }
+            }
             
             log.info("가상계좌 목록 조회 완료 - 조회 건수: {}", responseList.size());
             return RespDto.success("가상계좌 목록 조회 성공", responseList);
             
         } catch (Exception e) {
             log.error("가상계좌 목록 조회 중 오류 발생", e);
-            return RespDto.fail("가상계좌 목록 조회 중 오류가 발생했습니다.");
+            return RespDto.fail("가상계좌 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
     
@@ -82,6 +98,113 @@ public class VirtualAccountService {
             log.error("가상계좌 상세 조회 중 오류 발생 - virtualAccountCode: {}", virtualAccountCode, e);
             return RespDto.fail("가상계좌 조회 중 오류가 발생했습니다.");
         }
+    }
+    
+
+    /**
+     * 가상계좌 다중 저장 (신규/수정)
+     */
+    @Transactional
+    public RespDto<VirtualAccountBatchResult> saveVirtualAccounts(VirtualAccountSaveReqDto reqDto) {
+        
+        log.info("가상계좌 다중 저장 시작 - 총 {}건", reqDto.getVirtualAccounts().size());
+        
+        List<VirtualAccountRespDto> successData = new ArrayList<>();
+        List<VirtualAccountBatchResult.VirtualAccountErrorDto> failData = new ArrayList<>();
+        
+        for (VirtualAccountSaveReqDto.VirtualAccountItemDto item : reqDto.getVirtualAccounts()) {
+            try {
+                // 개별 가상계좌 저장 처리
+                VirtualAccountRespDto savedVirtualAccount = saveSingleVirtualAccount(item);
+                successData.add(savedVirtualAccount);
+                
+                log.info("가상계좌 저장 성공 - virtualAccountCode: {}, virtualAccountNum: {}", 
+                        savedVirtualAccount.getVirtualAccountCode(), savedVirtualAccount.getVirtualAccountNum());
+                
+            } catch (Exception e) {
+                log.error("가상계좌 저장 실패 - virtualAccountNum: {}, 에러: {}", item.getVirtualAccountNum(), e.getMessage());
+                
+                VirtualAccountBatchResult.VirtualAccountErrorDto errorDto = VirtualAccountBatchResult.VirtualAccountErrorDto.builder()
+                        .virtualAccountCode(item.getVirtualAccountCode())
+                        .virtualAccountNum(item.getVirtualAccountNum())
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성
+        VirtualAccountBatchResult result = VirtualAccountBatchResult.builder()
+                .totalCount(reqDto.getVirtualAccounts().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("가상계좌 저장 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("가상계좌 다중 저장 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getVirtualAccounts().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 가상계좌 저장 처리 (openDt 기본값 추가)
+     */
+    private VirtualAccountRespDto saveSingleVirtualAccount(VirtualAccountSaveReqDto.VirtualAccountItemDto item) {
+        
+        VirtualAccount virtualAccount;
+        
+        // openDt가 null이면 현재날짜로 설정
+        String openDt = item.getOpenDt();
+        if (openDt == null || openDt.trim().isEmpty()) {
+            openDt = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        }
+        
+        if (item.getVirtualAccountCode() == null) {
+            // 신규 등록 - 가상계좌번호 중복 체크
+            if (virtualAccountRepository.existsByVirtualAccountNum(item.getVirtualAccountNum())) {
+                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
+            }
+            
+            virtualAccount = VirtualAccount.builder()
+                    .hqCode(item.getHqCode())
+                    .virtualAccountNum(item.getVirtualAccountNum())
+                    .virtualAccountStatus(item.getVirtualAccountStatus())
+                    .bankName(item.getBankName())
+                    .linkedCustomerCode(item.getLinkedCustomerCode())
+                    .openDt(openDt)  // 기본값 적용
+                    .note(item.getNote())
+                    .build();
+            
+            virtualAccount = virtualAccountRepository.save(virtualAccount);
+            
+        } else {
+            // 수정 - 가상계좌번호 중복 체크 (자신 제외)
+            if (virtualAccountRepository.existsByVirtualAccountNumAndVirtualAccountCodeNot(
+                    item.getVirtualAccountNum(), item.getVirtualAccountCode())) {
+                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
+            }
+            
+            virtualAccount = virtualAccountRepository.findById(item.getVirtualAccountCode())
+                    .orElseThrow(() -> new RuntimeException("존재하지 않는 가상계좌입니다: " + item.getVirtualAccountCode()));
+            
+            // 모든 필드 수정
+            virtualAccount.setVirtualAccountNum(item.getVirtualAccountNum());
+            virtualAccount.setVirtualAccountStatus(item.getVirtualAccountStatus());
+            virtualAccount.setBankName(item.getBankName());
+            virtualAccount.setLinkedCustomerCode(item.getLinkedCustomerCode());
+            virtualAccount.setOpenDt(openDt);  // 기본값 적용
+            virtualAccount.setNote(item.getNote());
+            
+            virtualAccount = virtualAccountRepository.save(virtualAccount);
+        }
+        
+        return VirtualAccountRespDto.fromEntity(virtualAccount);
     }
     
     /**
@@ -216,6 +339,88 @@ public class VirtualAccountService {
             log.error("거래처 가상계좌 정보 업데이트 중 오류 발생 - customerCode: {}", 
                     virtualAccount.getLinkedCustomerCode(), e);
             // 가상계좌 저장은 성공했으므로 예외를 다시 던지지 않음
+        }
+    }
+    
+
+    /**
+     * 가상계좌 다중 삭제 (Hard Delete)
+     */
+    @Transactional
+    public RespDto<VirtualAccountBatchResult> deleteVirtualAccounts(VirtualAccountDeleteReqDto reqDto) {
+        
+        log.info("가상계좌 다중 삭제 시작 - 총 {}건", reqDto.getVirtualAccountCodes().size());
+        
+        List<Integer> successCodes = new ArrayList<>();
+        List<VirtualAccountBatchResult.VirtualAccountErrorDto> failData = new ArrayList<>();
+        
+        for (Integer virtualAccountCode : reqDto.getVirtualAccountCodes()) {
+            try {
+                // 개별 가상계좌 삭제 처리
+                deleteSingleVirtualAccount(virtualAccountCode);
+                successCodes.add(virtualAccountCode);
+                
+                log.info("가상계좌 삭제 성공 - virtualAccountCode: {}", virtualAccountCode);
+                
+            } catch (Exception e) {
+                log.error("가상계좌 삭제 실패 - virtualAccountCode: {}, 에러: {}", virtualAccountCode, e.getMessage());
+                
+                // 에러 시 가상계좌번호 조회 시도
+                String virtualAccountNum = getVirtualAccountNumSafely(virtualAccountCode);
+                
+                VirtualAccountBatchResult.VirtualAccountErrorDto errorDto = VirtualAccountBatchResult.VirtualAccountErrorDto.builder()
+                        .virtualAccountCode(virtualAccountCode)
+                        .virtualAccountNum(virtualAccountNum)
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성 (삭제는 successData 대신 성공 코드만)
+        VirtualAccountBatchResult result = VirtualAccountBatchResult.builder()
+                .totalCount(reqDto.getVirtualAccountCodes().size())
+                .successCount(successCodes.size())
+                .failCount(failData.size())
+                .successData(successCodes.stream()
+                        .map(code -> VirtualAccountRespDto.builder().virtualAccountCode(code).build())
+                        .collect(Collectors.toList()))
+                .failData(failData)
+                .build();
+        
+        String message = String.format("가상계좌 삭제 완료 - 성공: %d건, 실패: %d건", 
+                successCodes.size(), failData.size());
+        
+        log.info("가상계좌 다중 삭제 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getVirtualAccountCodes().size(), successCodes.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 가상계좌 삭제 처리 (Hard Delete)
+     */
+    private void deleteSingleVirtualAccount(Integer virtualAccountCode) {
+        
+        // 가상계좌 존재 확인
+        VirtualAccount virtualAccount = virtualAccountRepository.findById(virtualAccountCode)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 가상계좌입니다: " + virtualAccountCode));
+
+        // Hard Delete - 실제 레코드 삭제
+        virtualAccountRepository.delete(virtualAccount);
+    }
+    
+    /**
+     * 가상계좌번호 안전 조회 (에러 발생시 사용)
+     */
+    private String getVirtualAccountNumSafely(Integer virtualAccountCode) {
+        try {
+            return virtualAccountRepository.findById(virtualAccountCode)
+                    .map(VirtualAccount::getVirtualAccountNum)
+                    .orElse("알 수 없음");
+        } catch (Exception e) {
+            return "조회 실패";
         }
     }
     

@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 public class ReturnRespDto {
     
     // 반품 기본정보
-    private Integer returnCode;             // 반품코드
+    private String returnNo;             // 반품코드
     private Integer customerCode;           // 거래처코드
     private String customerName;            // 거래처명 (JOIN)
     private String returnRequestDate;       // 반품요청일

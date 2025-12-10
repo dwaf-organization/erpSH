@@ -1,19 +1,21 @@
 package com.inc.sh.service;
 
+import com.inc.sh.dto.itemCategory.reqDto.ItemCategoryDeleteReqDto;
 import com.inc.sh.dto.itemCategory.reqDto.ItemCategoryReqDto;
+import com.inc.sh.dto.itemCategory.reqDto.ItemCategorySaveReqDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.itemCategory.respDto.ItemCategoryTreeRespDto;
 import com.inc.sh.dto.itemCategory.respDto.ItemCategoryTableRespDto;
-import com.inc.sh.dto.itemCategory.respDto.ItemCategorySaveRespDto;
-import com.inc.sh.dto.itemCategory.respDto.ItemCategoryDeleteRespDto;
+import com.inc.sh.dto.itemCategory.respDto.ItemCategoryBatchResult;
+import com.inc.sh.dto.itemCategory.respDto.ItemCategoryRespDto;
 import com.inc.sh.entity.ItemCategory;
 import com.inc.sh.repository.ItemCategoryRepository;
-import com.inc.sh.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,48 +27,49 @@ import java.util.stream.Collectors;
 public class ItemCategoryService {
     
     private final ItemCategoryRepository itemCategoryRepository;
-    private final ItemRepository itemRepository;
     
     /**
      * 트리용 전체 품목분류 조회 (계층구조)
+     * @param hqCode 본사코드
      * @return 트리 구조 품목분류 목록
      */
     @Transactional(readOnly = true)
-    public RespDto<List<ItemCategoryTreeRespDto>> getCategoryTreeList() {
+    public RespDto<List<ItemCategoryTreeRespDto>> getCategoryTreeList(Integer hqCode) {
         try {
-            log.info("트리용 품목분류 전체 조회 시작");
+            log.info("트리용 품목분류 전체 조회 시작 - hqCode: {}", hqCode);
             
-            List<ItemCategory> categories = itemCategoryRepository.findAllOrderByHierarchy();
+            List<ItemCategory> categories = itemCategoryRepository.findByHqCodeOrderByHierarchy(hqCode);
             List<ItemCategoryTreeRespDto> treeList = buildCategoryTree(categories);
             
-            log.info("트리용 품목분류 전체 조회 완료 - 대분류 수: {}", treeList.size());
+            log.info("트리용 품목분류 전체 조회 완료 - hqCode: {}, 대분류 수: {}", hqCode, treeList.size());
             return RespDto.success("트리용 품목분류 조회 성공", treeList);
             
         } catch (Exception e) {
-            log.error("트리용 품목분류 전체 조회 중 오류 발생", e);
+            log.error("트리용 품목분류 전체 조회 중 오류 발생 - hqCode: {}", hqCode, e);
             return RespDto.fail("트리용 품목분류 조회 중 오류가 발생했습니다.");
         }
     }
     
     /**
      * 표용 전체 품목분류 조회 (평면 리스트)
+     * @param hqCode 본사코드
      * @return 표 형태 품목분류 목록
      */
     @Transactional(readOnly = true)
-    public RespDto<List<ItemCategoryTableRespDto>> getCategoryTableList() {
+    public RespDto<List<ItemCategoryTableRespDto>> getCategoryTableList(Integer hqCode) {
         try {
-            log.info("표용 품목분류 전체 조회 시작");
+            log.info("표용 품목분류 전체 조회 시작 - hqCode: {}", hqCode);
             
-            List<ItemCategory> categories = itemCategoryRepository.findAllOrderByHierarchy();
+            List<ItemCategory> categories = itemCategoryRepository.findByHqCodeOrderByHierarchy(hqCode);
             List<ItemCategoryTableRespDto> tableList = categories.stream()
                     .map(ItemCategoryTableRespDto::fromEntity)
                     .collect(Collectors.toList());
             
-            log.info("표용 품목분류 전체 조회 완료 - 조회 건수: {}", tableList.size());
+            log.info("표용 품목분류 전체 조회 완료 - hqCode: {}, 조회 건수: {}", hqCode, tableList.size());
             return RespDto.success("표용 품목분류 조회 성공", tableList);
             
         } catch (Exception e) {
-            log.error("표용 품목분류 전체 조회 중 오류 발생", e);
+            log.error("표용 품목분류 전체 조회 중 오류 발생 - hqCode: {}", hqCode, e);
             return RespDto.fail("표용 품목분류 조회 중 오류가 발생했습니다.");
         }
     }
@@ -74,137 +77,23 @@ public class ItemCategoryService {
     /**
      * 트리 클릭 시 본인 및 하위 항목 조회
      * @param categoryCode 클릭된 분류코드
+     * @param hqCode 본사코드
      * @return 본인 + 하위 분류 목록
      */
     @Transactional(readOnly = true)
     public RespDto<List<ItemCategoryTableRespDto>> getCategoryWithChildren(Integer categoryCode) {
         try {
-            log.info("트리 클릭 조회 시작 - categoryCode: {}", categoryCode);
             
-            List<ItemCategory> categories = itemCategoryRepository.findByParentAndChildren(categoryCode);
+            List<ItemCategory> categories = itemCategoryRepository.findByParentAndChildrenWithHqCode(categoryCode);
             List<ItemCategoryTableRespDto> tableList = categories.stream()
                     .map(ItemCategoryTableRespDto::fromEntity)
                     .collect(Collectors.toList());
             
-            log.info("트리 클릭 조회 완료 - categoryCode: {}, 조회 건수: {}", categoryCode, tableList.size());
             return RespDto.success("품목분류 하위 조회 성공", tableList);
             
         } catch (Exception e) {
             log.error("트리 클릭 조회 중 오류 발생 - categoryCode: {}", categoryCode, e);
             return RespDto.fail("품목분류 하위 조회 중 오류가 발생했습니다.");
-        }
-    }
-    
-    /**
-     * 품목분류 저장 (신규/수정)
-     * @param request 품목분류 정보
-     * @return 저장된 품목분류 코드
-     */
-    public RespDto<ItemCategorySaveRespDto> saveCategory(ItemCategoryReqDto request) {
-        try {
-            ItemCategory savedCategory;
-            String action;
-            
-            if (request.getCategoryCode() == null) {
-                // 신규 등록
-                log.info("품목분류 신규 등록 시작 - categoryName: {}, parentsCategoryCode: {}", 
-                        request.getCategoryName(), request.getParentsCategoryCode());
-                
-                ItemCategory category = request.toEntity();
-                savedCategory = itemCategoryRepository.save(category);
-                action = "등록";
-                
-            } else {
-                // 수정
-                log.info("품목분류 수정 시작 - categoryCode: {}, categoryName: {}", 
-                        request.getCategoryCode(), request.getCategoryName());
-                
-                ItemCategory existingCategory = itemCategoryRepository.findByCategoryCode(request.getCategoryCode());
-                if (existingCategory == null) {
-                    log.warn("수정할 품목분류를 찾을 수 없습니다 - categoryCode: {}", request.getCategoryCode());
-                    return RespDto.fail("수정할 품목분류를 찾을 수 없습니다.");
-                }
-                
-                request.updateEntity(existingCategory);
-                savedCategory = itemCategoryRepository.save(existingCategory);
-                action = "수정";
-            }
-            
-            // 간소화된 응답 생성
-            ItemCategorySaveRespDto responseDto = ItemCategorySaveRespDto.builder()
-                    .categoryCode(savedCategory.getCategoryCode())
-                    .build();
-            
-            log.info("품목분류 {} 완료 - categoryCode: {}, categoryName: {}", 
-                    action, savedCategory.getCategoryCode(), savedCategory.getCategoryName());
-            
-            return RespDto.success("품목분류가 성공적으로 " + action + "되었습니다.", responseDto);
-            
-        } catch (Exception e) {
-            log.error("품목분류 저장 중 오류 발생 - categoryCode: {}", request.getCategoryCode(), e);
-            return RespDto.fail("품목분류 저장 중 오류가 발생했습니다.");
-        }
-    }
-    
-    /**
-     * 품목분류 삭제 (하드 삭제)
-     * @param categoryCode 분류코드
-     * @return 삭제 결과 (품목 연관 확인)
-     */
-    public RespDto<ItemCategoryDeleteRespDto> deleteCategory(Integer categoryCode) {
-        try {
-            log.info("품목분류 삭제 시작 - categoryCode: {}", categoryCode);
-            
-            ItemCategory category = itemCategoryRepository.findByCategoryCode(categoryCode);
-            if (category == null) {
-                log.warn("삭제할 품목분류를 찾을 수 없습니다 - categoryCode: {}", categoryCode);
-                return RespDto.fail("삭제할 품목분류를 찾을 수 없습니다.");
-            }
-            
-            // 품목 테이블 연관 확인
-            List<Integer> relatedItemCodes = itemRepository.findItemCodesByCategoryCode(categoryCode);
-            if (!relatedItemCodes.isEmpty()) {
-                log.warn("연관된 품목이 있어 삭제할 수 없습니다 - categoryCode: {}, relatedItems: {}", 
-                        categoryCode, relatedItemCodes);
-                
-                String itemCodesStr = relatedItemCodes.stream()
-                        .map(String::valueOf)
-                        .collect(Collectors.joining(","));
-                
-                ItemCategoryDeleteRespDto responseDto = ItemCategoryDeleteRespDto.builder()
-                        .categoryCode(categoryCode)
-                        .relatedItemCodes(relatedItemCodes)
-                        .message("해당 품목분류가 품목테이블에 존재합니다. " + itemCodesStr)
-                        .build();
-                
-                return RespDto.fail("해당 품목분류가 품목테이블에 존재합니다. " + itemCodesStr);
-            }
-            
-            // 하위 분류 확인
-            List<ItemCategory> childCategories = itemCategoryRepository.findByParentsCategoryCodeOrderByCategoryLevel(categoryCode);
-            if (!childCategories.isEmpty()) {
-                log.warn("하위 분류가 있어 삭제할 수 없습니다 - categoryCode: {}, childCount: {}", 
-                        categoryCode, childCategories.size());
-                return RespDto.fail("하위 분류가 존재하여 삭제할 수 없습니다.");
-            }
-            
-            // 하드 삭제 진행
-            itemCategoryRepository.delete(category);
-            
-            // 삭제 성공 응답 생성
-            ItemCategoryDeleteRespDto responseDto = ItemCategoryDeleteRespDto.builder()
-                    .categoryCode(categoryCode)
-                    .relatedItemCodes(null)
-                    .message("품목분류가 성공적으로 삭제되었습니다.")
-                    .build();
-            
-            log.info("품목분류 삭제 완료 - categoryCode: {}", categoryCode);
-            
-            return RespDto.success("품목분류가 성공적으로 삭제되었습니다.", responseDto);
-            
-        } catch (Exception e) {
-            log.error("품목분류 삭제 중 오류 발생 - categoryCode: {}", categoryCode, e);
-            return RespDto.fail("품목분류 삭제 중 오류가 발생했습니다.");
         }
     }
     
@@ -244,6 +133,189 @@ public class ItemCategoryService {
         // 하위 분류에 대해서도 재귀 호출
         for (ItemCategoryTreeRespDto child : children) {
             setChildren(child, categoryMap);
+        }
+    }
+    
+    
+    /**
+     * 품목분류 다중 저장 (신규/수정)
+     */
+    @Transactional
+    public RespDto<ItemCategoryBatchResult> saveItemCategories(ItemCategorySaveReqDto reqDto) {
+        
+        log.info("품목분류 다중 저장 시작 - 총 {}건", reqDto.getItemCategories().size());
+        
+        List<ItemCategoryRespDto> successData = new ArrayList<>();
+        List<ItemCategoryBatchResult.ItemCategoryErrorDto> failData = new ArrayList<>();
+        
+        for (ItemCategorySaveReqDto.ItemCategoryItemDto item : reqDto.getItemCategories()) {
+            try {
+                // 개별 품목분류 저장 처리
+                ItemCategoryRespDto savedItemCategory = saveSingleItemCategory(item);
+                successData.add(savedItemCategory);
+                
+                log.info("품목분류 저장 성공 - categoryCode: {}, categoryName: {}", 
+                        savedItemCategory.getCategoryCode(), savedItemCategory.getCategoryName());
+                
+            } catch (Exception e) {
+                log.error("품목분류 저장 실패 - categoryName: {}, 에러: {}", item.getCategoryName(), e.getMessage());
+                
+                ItemCategoryBatchResult.ItemCategoryErrorDto errorDto = ItemCategoryBatchResult.ItemCategoryErrorDto.builder()
+                        .categoryCode(item.getCategoryCode())
+                        .categoryName(item.getCategoryName())
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성
+        ItemCategoryBatchResult result = ItemCategoryBatchResult.builder()
+                .totalCount(reqDto.getItemCategories().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("품목분류 저장 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("품목분류 다중 저장 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getItemCategories().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 품목분류 저장 처리
+     */
+    private ItemCategoryRespDto saveSingleItemCategory(ItemCategorySaveReqDto.ItemCategoryItemDto item) {
+        
+        ItemCategory itemCategory;
+        
+        if (item.getCategoryCode() == null) {
+            // 신규 등록
+            itemCategory = ItemCategory.builder()
+                    .hqCode(item.getHqCode())
+                    .parentsCategoryCode(item.getParentsCategoryCode())
+                    .categoryName(item.getCategoryName())
+                    .categoryLevel(item.getCategoryLevel())
+                    .description(item.getDescription())
+                    .build();
+            
+            itemCategory = itemCategoryRepository.save(itemCategory);
+            
+        } else {
+            // 수정
+            itemCategory = itemCategoryRepository.findById(item.getCategoryCode())
+                    .orElseThrow(() -> new RuntimeException("존재하지 않는 품목분류입니다: " + item.getCategoryCode()));
+            
+            // 모든 필드 수정
+            itemCategory.setParentsCategoryCode(item.getParentsCategoryCode());
+            itemCategory.setCategoryName(item.getCategoryName());
+            itemCategory.setCategoryLevel(item.getCategoryLevel());
+            itemCategory.setDescription(item.getDescription());
+            
+            itemCategory = itemCategoryRepository.save(itemCategory);
+        }
+        
+        return ItemCategoryRespDto.fromEntity(itemCategory);
+    }
+
+    /**
+     * 품목분류 다중 삭제 (Hard Delete + 하위분류 체크)
+     */
+    @Transactional
+    public RespDto<ItemCategoryBatchResult> deleteItemCategories(ItemCategoryDeleteReqDto reqDto) {
+        
+        log.info("품목분류 다중 삭제 시작 - 총 {}건", reqDto.getCategoryCodes().size());
+        
+        List<Integer> successCodes = new ArrayList<>();
+        List<ItemCategoryBatchResult.ItemCategoryErrorDto> failData = new ArrayList<>();
+        
+        for (Integer categoryCode : reqDto.getCategoryCodes()) {
+            try {
+                // 개별 품목분류 삭제 처리
+                deleteSingleItemCategory(categoryCode);
+                successCodes.add(categoryCode);
+                
+                log.info("품목분류 삭제 성공 - categoryCode: {}", categoryCode);
+                
+            } catch (Exception e) {
+                log.error("품목분류 삭제 실패 - categoryCode: {}, 에러: {}", categoryCode, e.getMessage());
+                
+                // 에러 시 품목분류명 조회 시도
+                String categoryName = getCategoryNameSafely(categoryCode);
+                
+                ItemCategoryBatchResult.ItemCategoryErrorDto errorDto = ItemCategoryBatchResult.ItemCategoryErrorDto.builder()
+                        .categoryCode(categoryCode)
+                        .categoryName(categoryName)
+                        .errorMessage(e.getMessage())
+                        .build();
+                
+                failData.add(errorDto);
+            }
+        }
+        
+        // 배치 결과 생성 (삭제는 successData 대신 성공 코드만)
+        ItemCategoryBatchResult result = ItemCategoryBatchResult.builder()
+                .totalCount(reqDto.getCategoryCodes().size())
+                .successCount(successCodes.size())
+                .failCount(failData.size())
+                .successData(successCodes.stream()
+                        .map(code -> ItemCategoryRespDto.builder().categoryCode(code).build())
+                        .collect(Collectors.toList()))
+                .failData(failData)
+                .build();
+        
+        String message = String.format("품목분류 삭제 완료 - 성공: %d건, 실패: %d건", 
+                successCodes.size(), failData.size());
+        
+        log.info("품목분류 다중 삭제 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getCategoryCodes().size(), successCodes.size(), failData.size());
+        
+        return RespDto.success(message, result);
+    }
+    
+    /**
+     * 개별 품목분류 삭제 처리 (품목 체크 제거 버전)
+     */
+    private void deleteSingleItemCategory(Integer categoryCode) {
+        
+        // 품목분류 존재 확인
+        ItemCategory itemCategory = itemCategoryRepository.findById(categoryCode)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 품목분류입니다: " + categoryCode));
+
+        // 하위분류 존재 여부 확인
+        Long childCount = itemCategoryRepository.countByParentsCategoryCode(categoryCode);
+        if (childCount > 0) {
+            throw new RuntimeException("하위분류가 " + childCount + "개 존재하여 삭제할 수 없습니다. 하위분류를 먼저 삭제해주세요.");
+        }
+
+        // 품목 체크는 일단 제거 (필요시 나중에 추가)
+        /*
+        Long itemCount = itemCategoryRepository.countItemsByCategoryCode(categoryCode);
+        if (itemCount > 0) {
+            throw new RuntimeException("해당 분류를 사용하는 품목이 " + itemCount + "개 존재하여 삭제할 수 없습니다.");
+        }
+        */
+
+        // Hard Delete - 실제 레코드 삭제
+        itemCategoryRepository.delete(itemCategory);
+    }
+    
+    /**
+     * 품목분류명 안전 조회 (에러 발생시 사용)
+     */
+    private String getCategoryNameSafely(Integer categoryCode) {
+        try {
+            return itemCategoryRepository.findById(categoryCode)
+                    .map(ItemCategory::getCategoryName)
+                    .orElse("알 수 없음");
+        } catch (Exception e) {
+            return "조회 실패";
         }
     }
 }

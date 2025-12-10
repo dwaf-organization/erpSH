@@ -2,7 +2,9 @@ package com.inc.sh.service;
 
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.brand.reqDto.BrandReqDto;
+import com.inc.sh.dto.brand.reqDto.BrandSaveReqDto;
 import com.inc.sh.dto.brand.reqDto.BrandDeleteReqDto;
+import com.inc.sh.dto.brand.respDto.BrandBatchResult;
 import com.inc.sh.dto.brand.respDto.BrandRespDto;
 import com.inc.sh.entity.BrandInfo;
 import com.inc.sh.repository.BrandRepository;
@@ -58,61 +60,98 @@ public class BrandService {
             return RespDto.fail("브랜드 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
-
     /**
-     * 브랜드 저장 (신규/수정)
-     * brandCode가 null이면 신규, 아니면 수정
+     * 브랜드 다중 저장 (신규/수정)
      */
     @Transactional
-    public RespDto<BrandRespDto> saveBrand(BrandReqDto request) {
-        try {
-            // 본사 존재 확인
-            if (!headquarterRepository.existsById(request.getHqCode())) {
-                return RespDto.fail("존재하지 않는 본사입니다: " + request.getHqCode());
-            }
-
-            BrandInfo brand;
-
-            if (request.getBrandCode() == null) {
-                // 신규 등록
-                brand = BrandInfo.builder()
-                        .hqCode(request.getHqCode())
-                        .brandName(request.getBrandName())
-                        .note(request.getNote())
+    public RespDto<BrandBatchResult> saveBrands(BrandSaveReqDto reqDto) {
+        
+        log.info("브랜드 다중 저장 시작 - 총 {}건", reqDto.getBrands().size());
+        
+        List<BrandRespDto> successData = new ArrayList<>();
+        List<BrandBatchResult.BrandErrorDto> failData = new ArrayList<>();
+        
+        for (BrandSaveReqDto.BrandItemDto item : reqDto.getBrands()) {
+            try {
+                // 개별 브랜드 저장 처리
+                BrandRespDto savedBrand = saveSingleBrand(item);
+                successData.add(savedBrand);
+                
+                log.info("브랜드 저장 성공 - brandCode: {}, brandName: {}", 
+                        savedBrand.getBrandCode(), savedBrand.getBrandName());
+                
+            } catch (Exception e) {
+                log.error("브랜드 저장 실패 - brandName: {}, 에러: {}", item.getBrandName(), e.getMessage());
+                
+                BrandBatchResult.BrandErrorDto errorDto = BrandBatchResult.BrandErrorDto.builder()
+                        .brandCode(item.getBrandCode())
+                        .brandName(item.getBrandName())
+                        .errorMessage(e.getMessage())
                         .build();
                 
-                brand = brandRepository.save(brand);
-                
-                return RespDto.success("브랜드가 성공적으로 등록되었습니다.", BrandRespDto.from(brand));
-
-            } else {
-                // 수정
-                brand = brandRepository.findById(request.getBrandCode())
-                        .orElse(null);
-
-                if (brand == null) {
-                    return RespDto.fail("존재하지 않는 브랜드입니다: " + request.getBrandCode());
-                }
-
-                // hqCode 확인
-                if (!brand.getHqCode().equals(request.getHqCode())) {
-                    return RespDto.fail("브랜드의 본사코드가 일치하지 않습니다.");
-                }
-
-                // 브랜드명과 비고만 수정
-                brand.setBrandName(request.getBrandName());
-                brand.setNote(request.getNote());
-                
-                brand = brandRepository.save(brand);
-                
-                return RespDto.success("브랜드가 성공적으로 수정되었습니다.", BrandRespDto.from(brand));
+                failData.add(errorDto);
             }
-
-        } catch (Exception e) {
-            return RespDto.fail("브랜드 저장 중 오류가 발생했습니다: " + e.getMessage());
         }
+        
+        // 배치 결과 생성
+        BrandBatchResult result = BrandBatchResult.builder()
+                .totalCount(reqDto.getBrands().size())
+                .successCount(successData.size())
+                .failCount(failData.size())
+                .successData(successData)
+                .failData(failData)
+                .build();
+        
+        String message = String.format("브랜드 저장 완료 - 성공: %d건, 실패: %d건", 
+                successData.size(), failData.size());
+        
+        log.info("브랜드 다중 저장 완료 - 총 {}건 중 성공 {}건, 실패 {}건", 
+                reqDto.getBrands().size(), successData.size(), failData.size());
+        
+        return RespDto.success(message, result);
     }
-
+    
+    /**
+     * 개별 브랜드 저장 처리
+     */
+    private BrandRespDto saveSingleBrand(BrandSaveReqDto.BrandItemDto item) {
+        
+        // 본사 존재 확인
+        if (!headquarterRepository.existsById(item.getHqCode())) {
+            throw new RuntimeException("존재하지 않는 본사입니다: " + item.getHqCode());
+        }
+        
+        BrandInfo brand;
+        
+        if (item.getBrandCode() == null) {
+            // 신규 등록
+            brand = BrandInfo.builder()
+                    .hqCode(item.getHqCode())
+                    .brandName(item.getBrandName())
+                    .note(item.getNote())
+                    .build();
+            
+            brand = brandRepository.save(brand);
+            
+        } else {
+            // 수정
+            brand = brandRepository.findById(item.getBrandCode())
+                    .orElseThrow(() -> new RuntimeException("존재하지 않는 브랜드입니다: " + item.getBrandCode()));
+            
+            // hqCode 확인
+            if (!brand.getHqCode().equals(item.getHqCode())) {
+                throw new RuntimeException("브랜드의 본사코드가 일치하지 않습니다.");
+            }
+            
+            // 브랜드명과 비고만 수정
+            brand.setBrandName(item.getBrandName());
+            brand.setNote(item.getNote());
+            
+            brand = brandRepository.save(brand);
+        }
+        
+        return BrandRespDto.from(brand);
+    }
     /**
      * 브랜드 단일 삭제 (호환성 유지용)
      */

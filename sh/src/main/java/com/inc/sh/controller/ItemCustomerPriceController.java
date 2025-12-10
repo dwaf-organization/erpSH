@@ -30,13 +30,15 @@ public class ItemCustomerPriceController {
     @GetMapping("/item-list")
     public ResponseEntity<RespDto<List<ItemForCustomerPriceRespDto>>> getItemListForCustomerPrice(
             @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "itemName", required = false) String itemName) {
+            @RequestParam(value = "itemName", required = false) String itemName,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별 단가관리 품목 조회 요청 - categoryCode: {}, itemName: {}", categoryCode, itemName);
+        log.info("거래처별 단가관리 품목 조회 요청 - categoryCode: {}, itemName: {}, hqCode: {}", categoryCode, itemName, hqCode);
         
         ItemCustomerPriceSearchDto searchDto = ItemCustomerPriceSearchDto.builder()
                 .categoryCode(categoryCode)
                 .itemName(itemName)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<ItemForCustomerPriceRespDto>> response = itemCustomerPriceService.getItemListForCustomerPrice(searchDto);
@@ -54,11 +56,12 @@ public class ItemCustomerPriceController {
      */
     @GetMapping("/customer-list")
     public ResponseEntity<RespDto<List<CustomerPriceRespDto>>> getCustomerPricesByItem(
-            @RequestParam("itemCode") Integer itemCode) {
+            @RequestParam("itemCode") Integer itemCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("품목별 거래처 단가 조회 요청 - itemCode: {}", itemCode);
+        log.info("품목별 거래처 단가 조회 요청 - itemCode: {}, hqCode: {}", itemCode, hqCode);
         
-        RespDto<List<CustomerPriceRespDto>> response = itemCustomerPriceService.getCustomerPricesByItem(itemCode);
+        RespDto<List<CustomerPriceRespDto>> response = itemCustomerPriceService.getCustomerPricesByItem(itemCode, hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);

@@ -2,10 +2,12 @@ package com.inc.sh.controller;
 
 import com.inc.sh.dto.deliveryHoliday.reqDto.DeliveryHolidaySearchDto;
 import com.inc.sh.dto.deliveryHoliday.reqDto.BasicHolidayReqDto;
+import com.inc.sh.dto.deliveryHoliday.reqDto.DeliveryHolidayDeleteReqDto;
 import com.inc.sh.dto.deliveryHoliday.reqDto.RegularHolidayReqDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayRespDto;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidaySaveRespDto;
+import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayBatchResult;
 import com.inc.sh.dto.deliveryHoliday.respDto.DeliveryHolidayDeleteRespDto;
 import com.inc.sh.service.DeliveryHolidayService;
 import jakarta.validation.Valid;
@@ -15,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/erp/delivery-holiday")
@@ -88,21 +91,33 @@ public class DeliveryHolidayController {
     }
 
     /**
-     * 배송휴일 삭제 (하드 삭제)
-     * DELETE /api/v1/erp/delivery-holiday/{deliveryHolidayCode}
+     * 배송휴일 다중 삭제 (Hard Delete)
+     * DELETE /api/v1/erp/delivery-holiday/delete
      */
-    @DeleteMapping("/{deliveryHolidayCode}")
-    public ResponseEntity<RespDto<DeliveryHolidayDeleteRespDto>> deleteDeliveryHoliday(
-            @PathVariable("deliveryHolidayCode") Integer deliveryHolidayCode) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<DeliveryHolidayBatchResult>> deleteDeliveryHolidays(@RequestBody DeliveryHolidayDeleteReqDto request) {
         
-        log.info("배송휴일 삭제 요청 - deliveryHolidayCode: {}", deliveryHolidayCode);
+        log.info("배송휴일 다중 삭제 요청 - 총 {}건", 
+                request.getDeliveryHolidayCodes() != null ? request.getDeliveryHolidayCodes().size() : 0);
         
-        RespDto<DeliveryHolidayDeleteRespDto> response = deliveryHolidayService.deleteDeliveryHoliday(deliveryHolidayCode);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getDeliveryHolidayCodes() == null || request.getDeliveryHolidayCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 배송휴일 코드가 없습니다."));
         }
+        
+        // 중복 제거
+        List<Integer> uniqueCodes = request.getDeliveryHolidayCodes().stream()
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (uniqueCodes.size() != request.getDeliveryHolidayCodes().size()) {
+            log.info("중복된 배송휴일 코드 제거됨 - 원본: {}건, 제거 후: {}건", 
+                    request.getDeliveryHolidayCodes().size(), uniqueCodes.size());
+            request.setDeliveryHolidayCodes(uniqueCodes);
+        }
+        
+        RespDto<DeliveryHolidayBatchResult> response = deliveryHolidayService.deleteDeliveryHolidays(request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -30,13 +30,15 @@ public class OrderLimitController {
     @GetMapping("/item-list")
     public ResponseEntity<RespDto<List<ItemForOrderLimitRespDto>>> getItemListForOrderLimit(
             @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "itemName", required = false) String itemName) {
+            @RequestParam(value = "itemName", required = false) String itemName,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("주문제한 설정 품목 조회 요청 - categoryCode: {}, itemName: {}", categoryCode, itemName);
+        log.info("주문제한 설정 품목 조회 요청 - categoryCode: {}, itemName: {}, hqCode: {}", categoryCode, itemName, hqCode);
         
         OrderLimitSearchDto searchDto = OrderLimitSearchDto.builder()
                 .categoryCode(categoryCode)
                 .itemName(itemName)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<ItemForOrderLimitRespDto>> response = orderLimitService.getItemListForOrderLimit(searchDto);
@@ -54,11 +56,12 @@ public class OrderLimitController {
      */
     @GetMapping("/customer-list")
     public ResponseEntity<RespDto<List<CustomerLimitRespDto>>> getCustomerLimitsByItem(
-            @RequestParam("itemCode") Integer itemCode) {
+            @RequestParam("itemCode") Integer itemCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("품목별 거래처 제한 정보 조회 요청 - itemCode: {}", itemCode);
+        log.info("품목별 거래처 제한 정보 조회 요청 - itemCode: {}, hqCode: {}", itemCode, hqCode);
         
-        RespDto<List<CustomerLimitRespDto>> response = orderLimitService.getCustomerLimitsByItem(itemCode);
+        RespDto<List<CustomerLimitRespDto>> response = orderLimitService.getCustomerLimitsByItem(itemCode, hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);

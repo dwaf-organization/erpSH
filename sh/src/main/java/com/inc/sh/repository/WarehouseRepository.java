@@ -12,6 +12,25 @@ import java.util.List;
 public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     
     /**
+     * 본사코드 존재 여부 확인
+     */
+    @Query("SELECT COUNT(h) FROM Headquarter h WHERE h.hqCode = :hqCode")
+    Long countByHqCode(@Param("hqCode") Integer hqCode);
+    
+    /**
+     * 물류센터코드 존재 여부 확인
+     */
+    @Query("SELECT COUNT(d) FROM DistCenter d WHERE d.distCenterCode = :distCenterCode")
+    Long countByDistCenterCode(@Param("distCenterCode") Integer distCenterCode);
+    
+    /**
+     * 창고에 재고가 있는 품목 개수 확인
+     */
+    @Query(value = "SELECT COUNT(*) FROM inventory i WHERE i.warehouse_code = :warehouseCode AND i.current_stock > 0", 
+           nativeQuery = true)
+    Long countInventoryByWarehouseCode(@Param("warehouseCode") Integer warehouseCode);
+    
+    /**
      * 창고 검색 조건으로 조회 (물류센터명 포함)
      * @param warehouseCode 창고코드 (완전일치, null 가능)
      * @param distCenterCode 물류센터코드 (완전일치, null 가능)
@@ -25,6 +44,25 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     List<Object[]> findWarehousesWithDistCenterName(
         @Param("warehouseCode") Integer warehouseCode,
         @Param("distCenterCode") Integer distCenterCode
+    );
+    
+    /**
+     * 창고 검색 조건으로 조회 (본사별, 물류센터명 포함)
+     * @param warehouseCode 창고코드 (완전일치, null 가능)
+     * @param distCenterCode 물류센터코드 (완전일치, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 창고 목록 (창고코드, 창고명, 물류센터명)
+     */
+    @Query("SELECT w.warehouseCode, w.warehouseName, dc.distCenterName " +
+           "FROM Warehouse w LEFT JOIN DistCenter dc ON w.distCenterCode = dc.distCenterCode " +
+           "WHERE (:warehouseCode IS NULL OR w.warehouseCode = :warehouseCode) AND " +
+           "(:distCenterCode IS NULL OR w.distCenterCode = :distCenterCode) AND " +
+           "w.hqCode = :hqCode " +
+           "ORDER BY w.warehouseCode ASC")
+    List<Object[]> findWarehousesWithDistCenterNameAndHqCode(
+        @Param("warehouseCode") Integer warehouseCode,
+        @Param("distCenterCode") Integer distCenterCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**

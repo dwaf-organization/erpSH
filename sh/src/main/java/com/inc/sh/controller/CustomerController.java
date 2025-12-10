@@ -1,8 +1,11 @@
 package com.inc.sh.controller;
 
 import com.inc.sh.common.dto.RespDto;
+import com.inc.sh.dto.customer.reqDto.CustomerDeleteReqDto;
 import com.inc.sh.dto.customer.reqDto.CustomerReqDto;
+import com.inc.sh.dto.customer.reqDto.CustomerSaveReqDto;
 import com.inc.sh.dto.customer.reqDto.CustomerSearchDto;
+import com.inc.sh.dto.customer.respDto.CustomerBatchResult;
 import com.inc.sh.dto.customer.respDto.CustomerDeleteRespDto;
 import com.inc.sh.dto.customer.respDto.CustomerRespDto;
 import com.inc.sh.service.CustomerService;
@@ -70,48 +73,70 @@ public class CustomerController {
             return ResponseEntity.badRequest().body(response);
         }
     }
-
     /**
-     * 거래처 저장 (신규/수정)
+     * 거래처 다중 저장 (신규/수정)
      * POST /api/v1/erp/customer/save
      */
     @PostMapping("/save")
-    public ResponseEntity<RespDto<CustomerRespDto>> saveCustomer(
-            @Valid @RequestBody CustomerReqDto request) {
+    public ResponseEntity<RespDto<CustomerBatchResult>> saveCustomers(@RequestBody CustomerSaveReqDto request) {
         
-        if (request.getCustomerCode() == null) {
-            log.info("거래처 신규 등록 요청 - customerName: {}, brandCode: {}", 
-                    request.getCustomerName(), request.getBrandCode());
-        } else {
-            log.info("거래처 수정 요청 - customerCode: {}, customerName: {}", 
-                    request.getCustomerCode(), request.getCustomerName());
+        log.info("거래처 다중 저장 요청 - 총 {}건", 
+                request.getCustomers() != null ? request.getCustomers().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getCustomers() == null || request.getCustomers().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 거래처 데이터가 없습니다."));
         }
         
-        RespDto<CustomerRespDto> response = customerService.saveCustomer(request);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 개별 항목 필수 필드 검증
+        for (CustomerSaveReqDto.CustomerItemDto customer : request.getCustomers()) {
+            if (customer.getHqCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("본사코드는 필수입니다."));
+            }
+            if (customer.getBrandCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("브랜드코드는 필수입니다."));
+            }
+            if (customer.getCustomerName() == null || customer.getCustomerName().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("거래처명은 필수입니다."));
+            }
+            if (customer.getOwnerName() == null || customer.getOwnerName().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("대표자는 필수입니다."));
+            }
+            if (customer.getBizNum() == null || customer.getBizNum().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("사업자번호는 필수입니다."));
+            }
+            if (customer.getDistCenterCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("물류센터코드는 필수입니다."));
+            }
         }
+        
+        RespDto<CustomerBatchResult> response = customerService.saveCustomers(request);
+        return ResponseEntity.ok(response);
     }
-
     /**
-     * 거래처 삭제 (폐기일자 입력)
-     * DELETE /api/v1/erp/customer/{customerCode}
+     * 거래처 다중 삭제
+     * DELETE /api/v1/erp/customer/delete
      */
-    @DeleteMapping("/{customerCode}")
-    public ResponseEntity<RespDto<CustomerDeleteRespDto>> deleteCustomer(
-            @PathVariable("customerCode") Integer customerCode) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<CustomerBatchResult>> deleteCustomers(@RequestBody CustomerDeleteReqDto request) {
         
-        log.info("거래처 삭제 요청 - customerCode: {}", customerCode);
+        log.info("거래처 다중 삭제 요청 - 총 {}건", 
+                request.getCustomerCodes() != null ? request.getCustomerCodes().size() : 0);
         
-        RespDto<CustomerDeleteRespDto> response = customerService.deleteCustomer(customerCode);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getCustomerCodes() == null || request.getCustomerCodes().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 거래처 코드가 없습니다."));
         }
+        
+        RespDto<CustomerBatchResult> response = customerService.deleteCustomers(request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -1,7 +1,10 @@
 package com.inc.sh.controller;
 
+import com.inc.sh.dto.returnManagement.reqDto.ReturnDeleteReqDto;
+import com.inc.sh.dto.returnManagement.reqDto.ReturnSaveReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSearchDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnUpdateDto;
+import com.inc.sh.dto.returnManagement.respDto.ReturnBatchResult;
 import com.inc.sh.dto.returnManagement.respDto.ReturnRespDto;
 import com.inc.sh.dto.returnRegistration.reqDto.ReturnOrderSearchDto;
 import com.inc.sh.dto.returnRegistration.reqDto.ReturnRegistrationSaveDto;
@@ -14,7 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/erp/return")
@@ -56,45 +62,7 @@ public class ReturnController {
             return ResponseEntity.badRequest().body(response);
         }
     }
-
-    /**
-     * 반품 수정
-     * PUT /api/v1/erp/return/update
-     */
-    @PutMapping("/update")
-    public ResponseEntity<RespDto<String>> updateReturn(@RequestBody ReturnUpdateDto updateDto) {
-        
-        log.info("반품 수정 요청 - 반품코드: {}", updateDto.getReturnCode());
-        
-        RespDto<String> response = returnManagementService.updateReturn(updateDto);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    /**
-     * 반품 삭제 (미승인 상태만 삭제 가능)
-     * DELETE /api/v1/erp/return/{returnNo}
-     */
-    @DeleteMapping("/{returnNo}")
-    public ResponseEntity<RespDto<String>> deleteReturn(@PathVariable String returnNo) {
-        
-        log.info("반품 삭제 요청 - 반품번호: {}", returnNo);
-        
-        RespDto<String> response = returnManagementService.deleteReturn(returnNo);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    // ==================== 반품등록 ====================
-
+    
     /**
      * 반품등록용 주문품목 조회
      * GET /api/v1/erp/return/order-items
@@ -106,35 +74,105 @@ public class ReturnController {
         
         log.info("반품등록용 주문품목 조회 요청 - 거래처코드: {}, 주문번호: {}", customerCode, orderNo);
         
+        // 검색 조건 DTO 생성
         ReturnOrderSearchDto searchDto = ReturnOrderSearchDto.builder()
                 .customerCode(customerCode)
                 .orderNo(orderNo)
                 .build();
         
+        // Service 호출
         RespDto<List<ReturnOrderItemRespDto>> response = returnRegistrationService.getOrderItemsForReturn(searchDto);
         
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 반품 다중 저장 (신규/수정) - 모든 검증 포함
+     * PUT /api/v1/erp/return/save
+     */
+    @PutMapping("/save")
+    public ResponseEntity<RespDto<ReturnBatchResult>> saveReturns(@RequestBody ReturnSaveReqDto request) {
+        
+        log.info("반품 다중 저장 요청 - 총 {}건", 
+                request.getReturns() != null ? request.getReturns().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getReturns() == null || request.getReturns().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("저장할 반품 데이터가 없습니다."));
         }
+        
+        // 개별 항목 필수 필드 검증
+        for (ReturnSaveReqDto.ReturnSaveItemDto returnItem : request.getReturns()) {
+            if (returnItem.getReturnCustomerCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("거래처코드는 필수입니다."));
+            }
+            if (returnItem.getItemCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("품목코드는 필수입니다."));
+            }
+            if (returnItem.getReturnRequestDt() == null || returnItem.getReturnRequestDt().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("반품요청일자는 필수입니다."));
+            }
+            if (returnItem.getOrderItemCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("주문품목코드는 필수입니다."));
+            }
+            if (returnItem.getOrderNo() == null || returnItem.getOrderNo().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("주문번호는 필수입니다."));
+            }
+            if (returnItem.getQty() == null || returnItem.getQty() <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("반품수량은 1 이상이어야 합니다."));
+            }
+            
+            // 기본값 설정
+            if (returnItem.getProgressStatus() == null || returnItem.getProgressStatus().trim().isEmpty()) {
+                returnItem.setProgressStatus("미승인");
+            }
+        }
+        
+        RespDto<ReturnBatchResult> response = returnManagementService.saveReturns(request);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * 반품 등록 (신규)
-     * POST /api/v1/erp/return/save
+     * 반품 다중 삭제 (미승인 상태만 삭제 가능)
+     * DELETE /api/v1/erp/return/delete
      */
-    @PostMapping("/save")
-    public ResponseEntity<RespDto<String>> saveReturn(@RequestBody ReturnRegistrationSaveDto saveDto) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<RespDto<ReturnBatchResult>> deleteReturns(@RequestBody ReturnDeleteReqDto request) {
         
-        log.info("반품 등록 요청 - 거래처코드: {}, 품목코드: {}", saveDto.getCustomerCode(), saveDto.getItemCode());
+        log.info("반품 다중 삭제 요청 - 총 {}건", 
+                request.getReturnNos() != null ? request.getReturnNos().size() : 0);
         
-        RespDto<String> response = returnRegistrationService.saveReturn(saveDto);
-        
-        if (response.getCode() == 1) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+        // 요청 데이터 검증
+        if (request.getReturnNos() == null || request.getReturnNos().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("삭제할 반품번호가 없습니다."));
         }
+        
+        // 반품번호 형식 검증 및 중복 제거
+        List<String> validReturnNos = request.getReturnNos().stream()
+                .filter(returnNo -> returnNo != null && !returnNo.trim().isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (validReturnNos.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("유효한 반품번호가 없습니다."));
+        }
+        
+        if (validReturnNos.size() != request.getReturnNos().size()) {
+            log.info("중복/빈값 반품번호 제거됨 - 원본: {}건, 제거 후: {}건", 
+                    request.getReturnNos().size(), validReturnNos.size());
+            request.setReturnNos(validReturnNos);
+        }
+        
+        RespDto<ReturnBatchResult> response = returnManagementService.deleteReturns(request);
+        return ResponseEntity.ok(response);
     }
 }

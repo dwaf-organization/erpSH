@@ -18,8 +18,6 @@ public class BrandRespDto {
     private Integer hqCode;
     private String brandName;
     private String note;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     /**
      * Entity -> RespDto 변환
@@ -30,8 +28,6 @@ public class BrandRespDto {
                 .hqCode(entity.getHqCode())
                 .brandName(entity.getBrandName())
                 .note(entity.getNote())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
                 .build();
     }
 }

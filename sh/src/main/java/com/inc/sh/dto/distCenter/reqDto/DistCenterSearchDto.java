@@ -11,4 +11,5 @@ public class DistCenterSearchDto {
     
     private Integer distCenterCode; // 물류센터코드 (완전일치)
     private Integer useYn;          // 사용여부 (0=미사용, 1=사용)
+    private Integer hqCode;         // 본사코드
 }

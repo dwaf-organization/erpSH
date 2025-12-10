@@ -24,6 +24,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
     boolean existsByCustomerCode(Integer customerCode);
     
     /**
+     * 사업자번호로 거래처 조회 (중복 체크용)
+     */
+    List<Customer> findByBizNum(String bizNum);
+    
+    /**
      * 복합 조건으로 거래처 조회
      * @param brandCode 브랜드코드 (null 가능)
      * @param customerName 거래처명 (LIKE 검색, null 가능)
@@ -40,6 +45,71 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "(:orderBlockYn IS NULL OR c.orderBlockYn = :orderBlockYn) " +
            "ORDER BY c.customerCode DESC")
     List<Customer> findBySearchConditions(
+        @Param("brandCode") Integer brandCode,
+        @Param("customerName") String customerName,
+        @Param("closeDtYn") Integer closeDtYn,
+        @Param("orderBlockYn") Integer orderBlockYn
+    );
+    
+    /**
+     * 복합 조건으로 거래처 조회 (브랜드명, 물류센터명 포함 - 새로 추가)
+     * @param brandCode 브랜드코드 (null 가능)
+     * @param customerName 거래처명 (LIKE 검색, null 가능)
+     * @param closeDtYn 종료여부 (1=종료, 0=활성, null=전체)
+     * @param orderBlockYn 주문금지여부 (1=금지, 0=허용, null=전체)
+     * @return Customer, brandName, distCenterName을 포함한 Object[] 배열
+     */
+    @Query(value = "SELECT " +
+           "c.customer_code, " +           // 0
+           "c.hq_code, " +                 // 1
+           "c.customer_name, " +           // 2
+           "c.owner_name, " +              // 3
+           "c.biz_num, " +                 // 4
+           "c.zip_code, " +                // 5
+           "c.addr, " +                    // 6
+           "c.biz_type, " +                // 7
+           "c.biz_sector, " +              // 8
+           "c.email, " +                   // 9
+           "c.tel_num, " +                 // 10
+           "c.mobile_num, " +              // 11
+           "c.fax_num, " +                 // 12
+           "c.tax_invoice_yn, " +          // 13
+           "c.tax_invoice_name, " +        // 14
+           "c.reg_dt, " +                  // 15
+           "c.close_dt, " +                // 16
+           "c.print_note, " +              // 17
+           "c.bank_name, " +               // 18
+           "c.account_holder, " +          // 19
+           "c.account_num, " +             // 20
+           "c.dist_center_code, " +        // 21
+           "c.brand_code, " +              // 22
+           "c.delivery_weekday, " +        // 23
+           "c.deposit_type_code, " +       // 24
+           "c.virtual_account, " +         // 25
+           "c.virtual_bank_name, " +       // 26
+           "c.balance_amt, " +             // 27
+           "c.hq_memo, " +                 // 28
+           "c.credit_limit, " +            // 29
+           "c.collection_day, " +          // 30
+           "c.order_block_yn, " +          // 31
+           "c.order_block_reason, " +      // 32
+           "c.order_block_dt, " +          // 33
+           "c.description, " +             // 34
+           "c.created_at, " +              // 35
+           "c.updated_at, " +              // 36
+           "b.brand_name, " +              // 37 - 브랜드명
+           "d.dist_center_name " +         // 38 - 물류센터명
+           "FROM customer c " +
+           "LEFT JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN dist_center d ON c.dist_center_code = d.dist_center_code " +
+           "WHERE (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerName IS NULL OR c.customer_name LIKE CONCAT('%', :customerName, '%')) " +
+           "AND (:closeDtYn IS NULL OR " +
+           "     (CASE WHEN :closeDtYn = 1 THEN c.close_dt IS NOT NULL " +
+           "           WHEN :closeDtYn = 0 THEN c.close_dt IS NULL END)) " +
+           "AND (:orderBlockYn IS NULL OR c.order_block_yn = :orderBlockYn) " +
+           "ORDER BY c.customer_code DESC", nativeQuery = true)
+    List<Object[]> findBySearchConditionsWithJoin(
         @Param("brandCode") Integer brandCode,
         @Param("customerName") String customerName,
         @Param("closeDtYn") Integer closeDtYn,
@@ -67,12 +137,31 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
     List<Object[]> findActiveCustomersWithBrandForOrderLimit();
     
     /**
+     * 주문제한 설정용 활성 거래처 조회 (브랜드명 포함, 본사별)
+     */
+    @Query("SELECT c.customerCode, c.customerName, b.brandName " +
+           "FROM Customer c LEFT JOIN BrandInfo b ON c.brandCode = b.brandCode " +
+           "WHERE c.closeDt IS NULL " + // 활성 거래처만
+           "AND c.hqCode = :hqCode " +
+           "ORDER BY c.customerCode ASC")
+    List<Object[]> findActiveCustomersWithBrandForOrderLimitByHqCode(@Param("hqCode") Integer hqCode);
+    
+    /**
      * 주문 가능한 거래처 조회 (브랜드명 포함) - 전체가능
      */
     @Query("SELECT c.customerCode, c.customerName, b.brandName " +
            "FROM Customer c LEFT JOIN BrandInfo b ON c.brandCode = b.brandCode " +
            "ORDER BY c.customerCode ASC")
     List<Object[]> findAllActiveCustomersWithBrand();
+    
+    /**
+     * 주문 가능한 거래처 조회 (브랜드명 포함, 본사별) - 전체가능
+     */
+    @Query("SELECT c.customerCode, c.customerName, b.brandName " +
+           "FROM Customer c LEFT JOIN BrandInfo b ON c.brandCode = b.brandCode " +
+           "WHERE c.hqCode = :hqCode " +
+           "ORDER BY c.customerCode ASC")
+    List<Object[]> findAllActiveCustomersWithBrandByHqCode(@Param("hqCode") Integer hqCode);
     
     /**
      * 주문 가능한 거래처 조회 (브랜드명 포함) - 선택불가 (제한 거래처 제외)
@@ -82,6 +171,16 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "WHERE c.customerCode NOT IN :limitedCustomerCodes " +
            "ORDER BY c.customerCode ASC")
     List<Object[]> findOrderableCustomersWithBrandExcluding(@Param("limitedCustomerCodes") List<Integer> limitedCustomerCodes);
+    
+    /**
+     * 주문 가능한 거래처 조회 (브랜드명 포함, 본사별) - 선택불가 (제한 거래처 제외)
+     */
+    @Query("SELECT c.customerCode, c.customerName, b.brandName " +
+           "FROM Customer c LEFT JOIN BrandInfo b ON c.brandCode = b.brandCode " +
+           "WHERE c.customerCode NOT IN :limitedCustomerCodes " +
+           "AND c.hqCode = :hqCode " +
+           "ORDER BY c.customerCode ASC")
+    List<Object[]> findOrderableCustomersWithBrandExcludingByHqCode(@Param("limitedCustomerCodes") List<Integer> limitedCustomerCodes, @Param("hqCode") Integer hqCode);
     
     /**
      * 주문 가능한 거래처 조회 (품목의 주문가능여부와 제한 거래처 고려)
@@ -122,7 +221,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
                                   @Param("bankName") String bankName);
     
     /**
-     * 팝업용 거래처 검색
+     * 팝업용 거래처 검색 (기존 메서드 - 조인 없음)
      * @param customerCode 거래처코드 (부분일치, null 가능)
      * @param customerName 거래처명 (부분일치, null 가능)
      * @param brandCode 브랜드코드 (완전일치, null 가능)
@@ -140,6 +239,68 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
     );
 
     /**
+     * 팝업용 거래처 검색 (브랜드명, 물류센터명 포함 - hq_code 파라미터 추가)
+     * @param hqCode 본사코드 (완전일치)
+     * @param customerSearch 거래처코드 또는 거래처명 (부분일치, null 가능)
+     * @param brandCode 브랜드코드 (완전일치, null 가능, '전체'면 null 처리)
+     * @return Customer, brandName, distCenterName을 포함한 Object[] 배열
+     */
+    @Query(value = "SELECT " +
+           "c.customer_code, " +           // 0
+           "c.hq_code, " +                 // 1
+           "c.customer_name, " +           // 2
+           "c.owner_name, " +              // 3
+           "c.biz_num, " +                 // 4
+           "c.zip_code, " +                // 5
+           "c.addr, " +                    // 6
+           "c.biz_type, " +                // 7
+           "c.biz_sector, " +              // 8
+           "c.email, " +                   // 9
+           "c.tel_num, " +                 // 10
+           "c.mobile_num, " +              // 11
+           "c.fax_num, " +                 // 12
+           "c.tax_invoice_yn, " +          // 13
+           "c.tax_invoice_name, " +        // 14
+           "c.reg_dt, " +                  // 15
+           "c.close_dt, " +                // 16
+           "c.print_note, " +              // 17
+           "c.bank_name, " +               // 18
+           "c.account_holder, " +          // 19
+           "c.account_num, " +             // 20
+           "c.dist_center_code, " +        // 21
+           "c.brand_code, " +              // 22
+           "c.delivery_weekday, " +        // 23
+           "c.deposit_type_code, " +       // 24
+           "c.virtual_account, " +         // 25
+           "c.virtual_bank_name, " +       // 26
+           "c.balance_amt, " +             // 27
+           "c.hq_memo, " +                 // 28
+           "c.credit_limit, " +            // 29
+           "c.collection_day, " +          // 30
+           "c.order_block_yn, " +          // 31
+           "c.order_block_reason, " +      // 32
+           "c.order_block_dt, " +          // 33
+           "c.description, " +             // 34
+           "c.created_at, " +              // 35
+           "c.updated_at, " +              // 36
+           "b.brand_name, " +              // 37
+           "d.dist_center_name " +         // 38
+           "FROM customer c " +
+           "LEFT JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN dist_center d ON c.dist_center_code = d.dist_center_code " +
+           "WHERE c.hq_code = :hqCode " +
+           "AND (:customerSearch IS NULL OR " +
+           "     CAST(c.customer_code AS CHAR) LIKE CONCAT('%', :customerSearch, '%') OR " +
+           "     c.customer_name LIKE CONCAT('%', :customerSearch, '%')) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "ORDER BY c.customer_code ASC", nativeQuery = true)
+    List<Object[]> findByPopupSearchConditionsWithJoin(
+        @Param("hqCode") Integer hqCode,
+        @Param("customerSearch") String customerSearch,
+        @Param("brandCode") Integer brandCode
+    );
+
+    /**
      * 브랜드별 후입금 거래처 조회 (미수잔액 관리용)
      */
     @Query(value = "SELECT " +
@@ -153,4 +314,54 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "AND c.deposit_type_code = 0 " +
            "ORDER BY c.customer_code", nativeQuery = true)
     List<Object[]> findCustomerBalanceByBrandCode(@Param("brandCode") Integer brandCode);
+    
+
+    /**
+     * 거래처코드로 조회 (brandName, distCenterName 조인 포함) - 저장 후 응답용
+     */
+    @Query(value = "SELECT " +
+           "c.customer_code, " +           // 0
+           "c.hq_code, " +                 // 1
+           "c.customer_name, " +           // 2
+           "c.owner_name, " +              // 3
+           "c.biz_num, " +                 // 4
+           "c.zip_code, " +                // 5
+           "c.addr, " +                    // 6
+           "c.biz_type, " +                // 7
+           "c.biz_sector, " +              // 8
+           "c.email, " +                   // 9
+           "c.tel_num, " +                 // 10
+           "c.mobile_num, " +              // 11
+           "c.fax_num, " +                 // 12
+           "c.tax_invoice_yn, " +          // 13
+           "c.tax_invoice_name, " +        // 14
+           "c.reg_dt, " +                  // 15
+           "c.close_dt, " +                // 16
+           "c.print_note, " +              // 17
+           "c.bank_name, " +               // 18
+           "c.account_holder, " +          // 19
+           "c.account_num, " +             // 20
+           "c.dist_center_code, " +        // 21
+           "c.brand_code, " +              // 22
+           "c.delivery_weekday, " +        // 23
+           "c.deposit_type_code, " +       // 24
+           "c.virtual_account, " +         // 25
+           "c.virtual_bank_name, " +       // 26
+           "c.balance_amt, " +             // 27
+           "c.hq_memo, " +                 // 28
+           "c.credit_limit, " +            // 29
+           "c.collection_day, " +          // 30
+           "c.order_block_yn, " +          // 31
+           "c.order_block_reason, " +      // 32
+           "c.order_block_dt, " +          // 33
+           "c.description, " +             // 34
+           "c.created_at, " +              // 35
+           "c.updated_at, " +              // 36
+           "b.brand_name, " +              // 37
+           "d.dist_center_name " +         // 38
+           "FROM customer c " +
+           "LEFT JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN dist_center d ON c.dist_center_code = d.dist_center_code " +
+           "WHERE c.customer_code = :customerCode", nativeQuery = true)
+    List<Object[]> findCustomerWithJoinByCustomerCode(@Param("customerCode") Integer customerCode);
 }

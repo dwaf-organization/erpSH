@@ -63,9 +63,10 @@ public class SettingController {
      */
     @GetMapping("/order-limit/list")
     public ResponseEntity<RespDto<List<OrderLimitRespDto>>> getOrderLimitList(
-    		@RequestParam("brand_code") Integer brandCode) {
+    		@RequestParam("brandCode") Integer brandCode,
+    		@RequestParam("hqCode") Integer hqCode) {
         
-        RespDto<List<OrderLimitRespDto>> response = settingService.getOrderLimitListByBrandCode(brandCode);
+        RespDto<List<OrderLimitRespDto>> response = settingService.getOrderLimitListByBrandCodeAndHqCode(brandCode, hqCode);
         return ResponseEntity.ok(response);
     }
     

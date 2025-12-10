@@ -1,15 +1,17 @@
 package com.inc.sh.dto.popup.reqDto;
 
-import lombok.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CustomerSearchPopupDto {
     
-    private String customerCode;    // 거래처코드 (부분일치)
-    private String customerName;    // 거래처명 (부분일치)
-    private Integer brandCode;      // 브랜드코드 (완전일치)
+    private Integer hqCode;         // 본사코드 (필수)
+    private String customerSearch;  // 거래처코드 또는 거래처명 (통합 검색)
+    private String brandCode;       // 브랜드코드 또는 '전체' (문자열로 받음)
 }
