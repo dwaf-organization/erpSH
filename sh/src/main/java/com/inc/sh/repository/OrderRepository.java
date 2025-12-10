@@ -69,15 +69,47 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     /**
      * 주문 조회 (본사별)
      */
-    @Query(value = "SELECT o.* FROM `order` o " +
-           "WHERE " +
-           "(:orderDtStart IS NULL OR o.order_dt >= :orderDtStart) AND " +
-           "(:orderDtEnd IS NULL OR o.order_dt <= :orderDtEnd) AND " +
-           "(:customerName IS NULL OR o.customer_name LIKE CONCAT('%', :customerName, '%')) AND " +
-           "(:deliveryStatus IS NULL OR o.delivery_status = :deliveryStatus) AND " +
-           "o.hq_code = :hqCode " +
-           "ORDER BY o.order_dt DESC, o.order_no DESC", nativeQuery = true)
-    List<Order> findBySearchConditionsWithHqCode(
+    @Query(value = "SELECT " +
+            "o.order_no, " +                     // 0
+            "o.hq_code, " +                      // 1
+            "o.customer_code, " +                // 2
+            "o.customer_name, " +                // 3
+            "o.biz_num, " +                      // 4
+            "o.addr, " +                         // 5
+            "o.order_dt, " +                     // 6
+            "o.delivery_request_dt, " +          // 7
+            "o.deposit_type_code, " +            // 8
+            "o.delivery_status, " +              // 9
+            "o.delivery_amt, " +                 // 10
+            "o.order_message, " +                // 11
+            "o.taxable_amt, " +                  // 12
+            "o.tax_free_amt, " +                 // 13
+            "o.supply_amt, " +                   // 14
+            "o.vat_amt, " +                      // 15
+            "o.total_amt, " +                    // 16
+            "o.total_qty, " +                    // 17
+            "o.created_at, " +                   // 18
+            "o.updated_at, " +                   // 19
+            "dc.dist_center_code, " +            // 20 - 물류센터코드
+            "dc.dist_center_name, " +            // 21 - 물류센터명
+            "dv.vehicle_code, " +                // 22 - 차량코드
+            "o.vehicle_name, " +                 // 23 - 차량명
+            "o.zip_code " +                      // 24 - 우편번호
+            "FROM `order` o " +
+            "LEFT JOIN customer c ON o.customer_code = c.customer_code " +
+            "LEFT JOIN dist_center dc ON c.dist_center_code = dc.dist_center_code " +
+            "LEFT JOIN vehicle dv ON o.vehicle_name = dv.vehicle_name " +
+            "WHERE " +
+            "(:orderDtStart IS NULL OR :orderDtStart = '' OR o.order_dt >= :orderDtStart) AND " +
+            "(:orderDtEnd IS NULL OR :orderDtEnd = '' OR o.order_dt <= :orderDtEnd) AND " +
+            "(:customerName IS NULL OR :customerName = '' OR o.customer_name LIKE CONCAT('%', :customerName, '%')) AND " +
+            "(" +
+            "  (:deliveryStatus IS NOT NULL AND :deliveryStatus != '' AND o.delivery_status = :deliveryStatus) OR " +
+            "  (:deliveryStatus IS NULL OR :deliveryStatus = '') AND o.delivery_status != '배송완료'" +
+            ") AND " +
+            "o.hq_code = :hqCode " +
+            "ORDER BY o.order_dt DESC, o.order_no DESC", nativeQuery = true)
+    List<Object[]> findBySearchConditionsWithHqCode(
         @Param("orderDtStart") String orderDtStart,
         @Param("orderDtEnd") String orderDtEnd,
         @Param("customerName") String customerName,
@@ -168,6 +200,25 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     );
     
     /**
+     * 배송관리용 주문 조회 (본사별)
+     */
+    @Query(value = "SELECT o.* FROM `order` o " +
+           "WHERE " +
+           "(:deliveryRequestDt IS NULL OR o.delivery_request_dt = :deliveryRequestDt) AND " +
+           "(:customerCode IS NULL OR o.customer_code = :customerCode) AND " +
+           "(:orderNo IS NULL OR o.order_no LIKE CONCAT('%', :orderNo, '%')) AND " +
+           "(:deliveryStatus IS NULL OR :deliveryStatus = '' OR o.delivery_status = :deliveryStatus) AND " +
+           "o.hq_code = :hqCode " +
+           "ORDER BY o.delivery_request_dt DESC, o.order_no DESC", nativeQuery = true)
+    List<Order> findByDeliverySearchConditionsWithHqCode(
+        @Param("deliveryRequestDt") String deliveryRequestDt,
+        @Param("customerCode") Integer customerCode,
+        @Param("orderNo") String orderNo,
+        @Param("deliveryStatus") String deliveryStatus,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 품목별 PickingList 조회
      * 배송요청 상태의 주문에서 품목별 출고량 집계
      */
@@ -202,6 +253,41 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         @Param("customerCode") Integer customerCode,
         @Param("distCenterCode") Integer distCenterCode,
         @Param("brandCode") Integer brandCode
+    );
+    
+    /**
+     * 품목별 PickingList 조회 (본사별)
+     * 배송요청 상태의 주문에서 품목별 출고량 집계 - 납기일자, 물류센터, 품목 순으로 그룹핑
+     */
+    @Query(value = "SELECT " +
+           "o.delivery_request_dt, " +           // 납기일자 추가
+           "dc.dist_center_code, " +             // 물류센터코드 추가
+           "dc.dist_center_name, " +             // 물류센터명  
+           "oi.item_code, " +                    // 품목코드
+           "oi.item_name, " +                    // 품명
+           "oi.specification, " +                // 규격
+           "oi.unit, " +                         // 단위
+           "SUM(oi.order_qty) as total_qty " +   // 출고량
+           "FROM `order` o " +
+           "JOIN order_item oi ON o.order_no = oi.order_no " +
+           "JOIN dist_center dc ON o.dist_center_code = dc.dist_center_code " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "WHERE o.delivery_status = '배송요청' " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR oi.item_code = :itemCode) " +
+           "AND (:distCenterCode IS NULL OR o.dist_center_code = :distCenterCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.delivery_request_dt, dc.dist_center_code, dc.dist_center_name, oi.item_code, oi.item_name, oi.specification, oi.unit " +
+           "ORDER BY o.delivery_request_dt, dc.dist_center_code, oi.item_code", nativeQuery = true)
+    List<Object[]> findPickingListByConditionsWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("distCenterCode") Integer distCenterCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -245,6 +331,48 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     );
     
     /**
+     * 거래처별원장용 주문 집계 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "'주문' as order_type, " +
+           "SUM(o.total_qty) as total_qty, " +
+           "SUM(o.tax_free_amt) as tax_free_amt, " +
+           "SUM(o.taxable_amt) as taxable_amt, " +
+           "SUM(o.supply_amt) as supply_amt, " +
+           "SUM(o.vat_amt) as vat_amt, " +
+           "SUM(o.total_amt) as total_amt, " +
+           "SUM(o.total_qty) as delivery_qty, " +
+           "SUM(o.supply_amt) as delivery_supply_amt, " +
+           "SUM(o.vat_amt) as delivery_vat_amt, " +
+           "SUM(o.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status = '배송요청' " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR EXISTS ( " +
+           "    SELECT 1 FROM order_item oi WHERE oi.order_no = o.order_no AND oi.item_code = :itemCode " +
+           ")) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.customer_code, o.customer_name, b.brand_name, c.tel_num " +
+           "ORDER BY o.customer_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerOrderSummaryWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 거래처별원장용 배송 집계 조회 (배송: 배송중 + 배송완료)
      */
     @Query(value = "SELECT " +
@@ -282,6 +410,48 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         @Param("itemCode") Integer itemCode,
         @Param("brandCode") Integer brandCode,
         @Param("customerCode") Integer customerCode
+    );
+    
+    /**
+     * 거래처별원장용 배송 집계 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "'배송' as order_type, " +
+           "SUM(o.total_qty) as total_qty, " +
+           "SUM(o.tax_free_amt) as tax_free_amt, " +
+           "SUM(o.taxable_amt) as taxable_amt, " +
+           "SUM(o.supply_amt) as supply_amt, " +
+           "SUM(o.vat_amt) as vat_amt, " +
+           "SUM(o.total_amt) as total_amt, " +
+           "SUM(o.total_qty) as delivery_qty, " +
+           "SUM(o.supply_amt) as delivery_supply_amt, " +
+           "SUM(o.vat_amt) as delivery_vat_amt, " +
+           "SUM(o.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status IN ('배송중', '배송완료') " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR EXISTS ( " +
+           "    SELECT 1 FROM order_item oi WHERE oi.order_no = o.order_no AND oi.item_code = :itemCode " +
+           ")) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.customer_code, o.customer_name, b.brand_name, c.tel_num " +
+           "ORDER BY o.customer_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerDeliverySummaryWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -326,6 +496,49 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     );
     
     /**
+     * 거래처별원장용 주문 세부 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "oi.item_code, " +
+           "oi.item_name, " +
+           "oi.specification, " +
+           "oi.unit, " +
+           "'주문' as order_type, " +
+           "SUM(oi.order_qty) as total_qty, " +
+           "SUM(oi.supply_amt) as supply_amt, " +
+           "SUM(oi.vat_amt) as vat_amt, " +
+           "SUM(oi.total_amt) as total_amt, " +
+           "SUM(oi.order_qty) as delivery_qty, " +
+           "SUM(oi.supply_amt) as delivery_supply_amt, " +
+           "SUM(oi.vat_amt) as delivery_vat_amt, " +
+           "SUM(oi.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN order_item oi ON o.order_no = oi.order_no " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status = '배송요청' " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR oi.item_code = :itemCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.customer_code, o.customer_name, b.brand_name, c.tel_num, oi.item_code, oi.item_name, oi.specification, oi.unit " +
+           "ORDER BY o.customer_code, oi.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerOrderDetailWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 거래처별원장용 배송 세부 조회 (배송: 배송중 + 배송완료)
      */
     @Query(value = "SELECT " +
@@ -364,6 +577,49 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         @Param("itemCode") Integer itemCode,
         @Param("brandCode") Integer brandCode,
         @Param("customerCode") Integer customerCode
+    );
+    
+    /**
+     * 거래처별원장용 배송 세부 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "oi.item_code, " +
+           "oi.item_name, " +
+           "oi.specification, " +
+           "oi.unit, " +
+           "'배송' as order_type, " +
+           "SUM(oi.order_qty) as total_qty, " +
+           "SUM(oi.supply_amt) as supply_amt, " +
+           "SUM(oi.vat_amt) as vat_amt, " +
+           "SUM(oi.total_amt) as total_amt, " +
+           "SUM(oi.order_qty) as delivery_qty, " +
+           "SUM(oi.supply_amt) as delivery_supply_amt, " +
+           "SUM(oi.vat_amt) as delivery_vat_amt, " +
+           "SUM(oi.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN order_item oi ON o.order_no = oi.order_no " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status IN ('배송중', '배송완료') " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR oi.item_code = :itemCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.customer_code, o.customer_name, b.brand_name, c.tel_num, oi.item_code, oi.item_name, oi.specification, oi.unit " +
+           "ORDER BY o.customer_code, oi.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerDeliveryDetailWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -409,6 +665,50 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     );
     
     /**
+     * 거래처별원장용 주문 일자별 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.delivery_request_dt as order_date, " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "oi.item_code, " +
+           "oi.item_name, " +
+           "oi.specification, " +
+           "oi.unit, " +
+           "'주문' as order_type, " +
+           "SUM(oi.order_qty) as total_qty, " +
+           "SUM(oi.supply_amt) as supply_amt, " +
+           "SUM(oi.vat_amt) as vat_amt, " +
+           "SUM(oi.total_amt) as total_amt, " +
+           "SUM(oi.order_qty) as delivery_qty, " +
+           "SUM(oi.supply_amt) as delivery_supply_amt, " +
+           "SUM(oi.vat_amt) as delivery_vat_amt, " +
+           "SUM(oi.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN order_item oi ON o.order_no = oi.order_no " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status = '배송요청' " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR oi.item_code = :itemCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.delivery_request_dt, o.customer_code, o.customer_name, b.brand_name, c.tel_num, oi.item_code, oi.item_name, oi.specification, oi.unit " +
+           "ORDER BY o.delivery_request_dt, o.customer_code, oi.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerOrderDailyWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 거래처별원장용 배송 일자별 조회 (배송: 배송중 + 배송완료)
      */
     @Query(value = "SELECT " +
@@ -448,6 +748,50 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         @Param("itemCode") Integer itemCode,
         @Param("brandCode") Integer brandCode,
         @Param("customerCode") Integer customerCode
+    );
+    
+    /**
+     * 거래처별원장용 배송 일자별 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.delivery_request_dt as order_date, " +
+           "o.customer_code, " +
+           "o.customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "oi.item_code, " +
+           "oi.item_name, " +
+           "oi.specification, " +
+           "oi.unit, " +
+           "'배송' as order_type, " +
+           "SUM(oi.order_qty) as total_qty, " +
+           "SUM(oi.supply_amt) as supply_amt, " +
+           "SUM(oi.vat_amt) as vat_amt, " +
+           "SUM(oi.total_amt) as total_amt, " +
+           "SUM(oi.order_qty) as delivery_qty, " +
+           "SUM(oi.supply_amt) as delivery_supply_amt, " +
+           "SUM(oi.vat_amt) as delivery_vat_amt, " +
+           "SUM(oi.total_amt) as delivery_total_amt " +
+           "FROM `order` o " +
+           "JOIN order_item oi ON o.order_no = oi.order_no " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "WHERE o.delivery_status IN ('배송중', '배송완료') " +
+           "AND (:deliveryRequestDtStart IS NULL OR o.delivery_request_dt >= :deliveryRequestDtStart) " +
+           "AND (:deliveryRequestDtEnd IS NULL OR o.delivery_request_dt <= :deliveryRequestDtEnd) " +
+           "AND (:itemCode IS NULL OR oi.item_code = :itemCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND o.hq_code = :hqCode " +
+           "GROUP BY o.delivery_request_dt, o.customer_code, o.customer_name, b.brand_name, c.tel_num, oi.item_code, oi.item_name, oi.specification, oi.unit " +
+           "ORDER BY o.delivery_request_dt, o.customer_code, oi.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerDeliveryDailyWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**

@@ -28,22 +28,20 @@ public class PickingListController {
             @RequestParam(value = "deliveryRequestDtStart", required = false) String deliveryRequestDtStart,
             @RequestParam(value = "deliveryRequestDtEnd", required = false) String deliveryRequestDtEnd,
             @RequestParam(value = "itemCode", required = false) Integer itemCode,
-            @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "customerCode", required = false) Integer customerCode,
             @RequestParam(value = "distCenterCode", required = false) Integer distCenterCode,
-            @RequestParam(value = "brandCode", required = false) Integer brandCode) {
+            @RequestParam(value = "brandCode", required = false) Integer brandCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("품목별 PickingList 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 분류코드: {}, 거래처코드: {}, 물류센터코드: {}, 브랜드코드: {}", 
-                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, categoryCode, customerCode, distCenterCode, brandCode);
+        log.info("품목별 PickingList 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 물류센터코드: {}, 브랜드코드: {}, hqCode: {}", 
+                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, distCenterCode, brandCode, hqCode);
         
         PickingListSearchDto searchDto = PickingListSearchDto.builder()
                 .deliveryRequestDtStart(deliveryRequestDtStart)
                 .deliveryRequestDtEnd(deliveryRequestDtEnd)
                 .itemCode(itemCode)
-                .categoryCode(categoryCode)
-                .customerCode(customerCode)
                 .distCenterCode(distCenterCode)
                 .brandCode(brandCode)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<PickingListRespDto>> response = pickingListService.getPickingList(searchDto);

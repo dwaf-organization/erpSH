@@ -28,16 +28,18 @@ public class DeliveryController {
             @RequestParam(value = "deliveryRequestDt", required = false) String deliveryRequestDt,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
             @RequestParam(value = "orderNo", required = false) String orderNo,
-            @RequestParam(value = "deliveryStatus", required = false) String deliveryStatus) {
+            @RequestParam(value = "deliveryStatus", required = false) String deliveryStatus,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("배송 주문 목록 조회 요청 - deliveryRequestDt: {}, customerCode: {}, orderNo: {}, deliveryStatus: {}", 
-                deliveryRequestDt, customerCode, orderNo, deliveryStatus);
+        log.info("배송 주문 목록 조회 요청 - deliveryRequestDt: {}, customerCode: {}, orderNo: {}, deliveryStatus: {}, hqCode: {}", 
+                deliveryRequestDt, customerCode, orderNo, deliveryStatus, hqCode);
         
         DeliverySearchDto searchDto = DeliverySearchDto.builder()
                 .deliveryRequestDt(deliveryRequestDt)
                 .customerCode(customerCode)
                 .orderNo(orderNo)
                 .deliveryStatus(deliveryStatus)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<OrderRespDto>> response = deliveryService.getDeliveryList(searchDto);

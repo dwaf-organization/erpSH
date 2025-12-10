@@ -9,10 +9,12 @@ import lombok.*;
 @Builder
 public class PickingListRespDto {
     
-    private String distCenterName;    // 물류센터명
-    private Integer itemCode;         // 품목코드
-    private String itemName;          // 품명
-    private String specification;     // 규격
-    private String unit;              // 단위
-    private Integer totalQty;         // 출고량 (품목별 주문수량 합계)
+    private String deliveryRequestDt;    // 납기일자
+    private Integer distCenterCode;      // 물류센터코드
+    private String distCenterName;       // 물류센터명
+    private Integer itemCode;            // 품목코드
+    private String itemName;             // 품명
+    private String specification;        // 규격
+    private String unit;                 // 단위
+    private Integer totalQty;            // 출고량 (총 수량)
 }

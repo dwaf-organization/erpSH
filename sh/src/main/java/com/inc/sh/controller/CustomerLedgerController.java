@@ -32,10 +32,14 @@ public class CustomerLedgerController {
             @RequestParam(value = "itemCode", required = false) Integer itemCode,
             @RequestParam(value = "brandCode", required = false) Integer brandCode,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
-            @RequestParam(value = "orderStatus", required = false) String orderStatus) {
+            @RequestParam(value = "orderStatus", required = false) String orderStatus,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별원장 집계 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}", 
-                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus);
+        log.info("거래처별원장 집계 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}, hqCode: {}", 
+                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus, hqCode);
+        
+        // '전체'를 빈값으로 처리
+        String processedOrderStatus = "전체".equals(orderStatus) ? "" : orderStatus;
         
         CustomerLedgerSummarySearchDto searchDto = CustomerLedgerSummarySearchDto.builder()
                 .deliveryRequestDtStart(deliveryRequestDtStart)
@@ -43,7 +47,8 @@ public class CustomerLedgerController {
                 .itemCode(itemCode)
                 .brandCode(brandCode)
                 .customerCode(customerCode)
-                .orderStatus(orderStatus)
+                .orderStatus(processedOrderStatus)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<CustomerLedgerSummaryRespDto>> response = customerLedgerService.getCustomerLedgerSummary(searchDto);
@@ -66,10 +71,14 @@ public class CustomerLedgerController {
             @RequestParam(value = "itemCode", required = false) Integer itemCode,
             @RequestParam(value = "brandCode", required = false) Integer brandCode,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
-            @RequestParam(value = "orderStatus", required = false) String orderStatus) {
+            @RequestParam(value = "orderStatus", required = false) String orderStatus,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별원장 세부 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}", 
-                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus);
+        log.info("거래처별원장 세부 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}, hqCode: {}", 
+                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus, hqCode);
+        
+        // '전체'를 빈값으로 처리
+        String processedOrderStatus = "전체".equals(orderStatus) ? "" : orderStatus;
         
         CustomerLedgerSummarySearchDto searchDto = CustomerLedgerSummarySearchDto.builder()
                 .deliveryRequestDtStart(deliveryRequestDtStart)
@@ -77,7 +86,8 @@ public class CustomerLedgerController {
                 .itemCode(itemCode)
                 .brandCode(brandCode)
                 .customerCode(customerCode)
-                .orderStatus(orderStatus)
+                .orderStatus(processedOrderStatus)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<CustomerLedgerDetailRespDto>> response = customerLedgerService.getCustomerLedgerDetail(searchDto);
@@ -100,10 +110,14 @@ public class CustomerLedgerController {
             @RequestParam(value = "itemCode", required = false) Integer itemCode,
             @RequestParam(value = "brandCode", required = false) Integer brandCode,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
-            @RequestParam(value = "orderStatus", required = false) String orderStatus) {
+            @RequestParam(value = "orderStatus", required = false) String orderStatus,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별원장 일자별 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}", 
-                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus);
+        log.info("거래처별원장 일자별 조회 요청 - 납기일자: {}~{}, 품목코드: {}, 브랜드코드: {}, 거래처코드: {}, 주문상태: {}, hqCode: {}", 
+                deliveryRequestDtStart, deliveryRequestDtEnd, itemCode, brandCode, customerCode, orderStatus, hqCode);
+        
+        // '전체'를 빈값으로 처리
+        String processedOrderStatus = "전체".equals(orderStatus) ? "" : orderStatus;
         
         CustomerLedgerSummarySearchDto searchDto = CustomerLedgerSummarySearchDto.builder()
                 .deliveryRequestDtStart(deliveryRequestDtStart)
@@ -111,7 +125,8 @@ public class CustomerLedgerController {
                 .itemCode(itemCode)
                 .brandCode(brandCode)
                 .customerCode(customerCode)
-                .orderStatus(orderStatus)
+                .orderStatus(processedOrderStatus)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<CustomerLedgerDailyRespDto>> response = customerLedgerService.getCustomerLedgerDaily(searchDto);

@@ -34,24 +34,27 @@ public class DeliveryService {
     @Transactional(readOnly = true)
     public RespDto<List<OrderRespDto>> getDeliveryList(DeliverySearchDto searchDto) {
         try {
-            log.info("배송 주문 목록 조회 시작 - 조건: {}", searchDto);
+            log.info("배송 주문 목록 조회 시작 - deliveryRequestDt: {}, customerCode: {}, orderNo: {}, deliveryStatus: {}, hqCode: {}", 
+                    searchDto.getDeliveryRequestDt(), searchDto.getCustomerCode(), 
+                    searchDto.getOrderNo(), searchDto.getDeliveryStatus(), searchDto.getHqCode());
             
-            List<Order> orders = orderRepository.findByDeliverySearchConditions(
+            List<Order> orders = orderRepository.findByDeliverySearchConditionsWithHqCode(
                     searchDto.getDeliveryRequestDt(),
                     searchDto.getCustomerCode(),
                     searchDto.getOrderNo(),
-                    searchDto.getDeliveryStatus()
+                    searchDto.getDeliveryStatus(),
+                    searchDto.getHqCode()
             );
             
             List<OrderRespDto> responseList = orders.stream()
                     .map(OrderRespDto::fromEntity)
                     .collect(Collectors.toList());
             
-            log.info("배송 주문 목록 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("배송 주문 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("배송 주문 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("배송 주문 목록 조회 중 오류 발생", e);
+            log.error("배송 주문 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("배송 주문 목록 조회 중 오류가 발생했습니다.");
         }
     }

@@ -38,6 +38,9 @@ public class Order {
     @Column(name = "biz_num", length = 250)
     private String bizNum;
     
+    @Column(name = "zip_code", length = 250)
+    private String zipCode;
+    
     @Column(name = "addr", length = 250)
     private String addr;
     

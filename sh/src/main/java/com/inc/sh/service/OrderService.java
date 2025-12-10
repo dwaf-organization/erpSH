@@ -34,6 +34,60 @@ public class OrderService {
     private final WarehouseItemsRepository warehouseItemsRepository;
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
+
+    /**
+     * 주문 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public RespDto<List<OrderRespDto>> getOrderList(OrderSearchDto searchDto) {
+        try {
+            log.info("주문 목록 조회 시작 - orderDtStart: {}, orderDtEnd: {}, customerName: {}, deliveryStatus: {}, hqCode: {}",
+                    searchDto.getOrderDtStart(), searchDto.getOrderDtEnd(), 
+                    searchDto.getCustomerName(), searchDto.getDeliveryStatus(), searchDto.getHqCode());
+            
+            List<Object[]> orders = orderRepository.findBySearchConditionsWithHqCode(
+                    searchDto.getOrderDtStart(),
+                    searchDto.getOrderDtEnd(),
+                    searchDto.getCustomerName(),
+                    searchDto.getDeliveryStatus(),
+                    searchDto.getHqCode()
+            );
+            
+            List<OrderRespDto> responseList = orders.stream()
+                    .map(OrderRespDto::fromObjectArrayWithDistCenter)
+                    .collect(Collectors.toList());
+            
+            log.info("주문 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
+            return RespDto.success("주문 목록 조회 성공", responseList);
+            
+        } catch (Exception e) {
+            log.error("주문 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
+            return RespDto.fail("주문 목록 조회 중 오류가 발생했습니다.");
+        }
+    }
+
+    /**
+     * 주문품목 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public RespDto<List<OrderItemRespDto>> getOrderItemList(String orderNo) {
+        try {
+            log.info("주문품목 목록 조회 시작 - orderNo: {}", orderNo);
+            
+            List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderNo);
+            
+            List<OrderItemRespDto> responseList = orderItems.stream()
+                    .map(OrderItemRespDto::fromEntity)
+                    .collect(Collectors.toList());
+            
+            return RespDto.success("주문품목 목록 조회 성공", responseList);
+            
+        } catch (Exception e) {
+            log.error("주문품목 목록 조회 중 오류 발생", e);
+            return RespDto.fail("주문품목 목록 조회 중 오류가 발생했습니다.");
+        }
+    }
+
     /**
      * 주문 다중 저장 (신규/수정)
      */
@@ -130,13 +184,6 @@ public class OrderService {
             }
         }
 
-        // 5. 충전형 주문시 잔액 확인
-        if (saveDto.getDepositTypeCode() != null && saveDto.getDepositTypeCode() == 1 && saveDto.getTotalAmt() != null) {
-            if (customer.getBalanceAmt() < saveDto.getTotalAmt()) {
-                throw new RuntimeException("잔액이 부족합니다. 현재 잔액: " + customer.getBalanceAmt() + "원, 주문금액: " + saveDto.getTotalAmt() + "원");
-            }
-        }
-
         String orderNo;
         Order orderEntity;
         
@@ -152,6 +199,7 @@ public class OrderService {
                     .distCenterCode(saveDto.getDistCenterCode())
                     .customerName(customer.getCustomerName())
                     .bizNum(customer.getBizNum())
+                    .zipCode(customer.getZipCode())
                     .addr(customer.getAddr())
                     .ownerName(customer.getOwnerName())
                     .telNum(customer.getTelNum())
@@ -187,14 +235,25 @@ public class OrderService {
             }
             
             // 주문 정보 수정
+            orderEntity.setCustomerCode(saveDto.getCustomerCode());
+            orderEntity.setVehicleCode(saveDto.getVehicleCode());
+            orderEntity.setDistCenterCode(saveDto.getDistCenterCode());
+            
+            // 거래처 정보 업데이트
+            orderEntity.setCustomerName(customer.getCustomerName());
+            orderEntity.setBizNum(customer.getBizNum());
+            orderEntity.setZipCode(customer.getZipCode());
+            orderEntity.setAddr(customer.getAddr());
+            orderEntity.setOwnerName(customer.getOwnerName());
+            orderEntity.setTelNum(customer.getTelNum());
+            
+            // 주문 관련 정보 업데이트
+            orderEntity.setOrderDt(saveDto.getOrderDt());
             orderEntity.setDeliveryRequestDt(saveDto.getDeliveryRequestDt());
-            orderEntity.setOrderMessage(saveDto.getOrderMessage());
             orderEntity.setDeliveryAmt(saveDto.getDeliveryAmt());
             orderEntity.setDeliveryStatus(saveDto.getDeliveryStatus());
-            
-            if (saveDto.getVehicleCode() != null) {
-                orderEntity.setVehicleCode(saveDto.getVehicleCode());
-            }
+            orderEntity.setDepositTypeCode(customer.getDepositTypeCode());
+            orderEntity.setOrderMessage(saveDto.getOrderMessage());
             
             orderEntity = orderRepository.save(orderEntity);
             orderNo = orderEntity.getOrderNo();
@@ -204,6 +263,7 @@ public class OrderService {
         
         return OrderRespDto.fromEntity(orderEntity);
     }
+    
     /**
      * 주문품목 업데이트 (orderItemCode 기반 생성/수정)
      */
@@ -460,59 +520,6 @@ public class OrderService {
             closing.setCalAmount(calAmount);
             
             monthlyInventoryClosingRepository.save(closing);
-        }
-    }
-
-    /**
-     * 주문 목록 조회
-     */
-    @Transactional(readOnly = true)
-    public RespDto<List<OrderRespDto>> getOrderList(OrderSearchDto searchDto) {
-        try {
-            log.info("주문 목록 조회 시작 - orderDtStart: {}, orderDtEnd: {}, customerName: {}, deliveryStatus: {}, hqCode: {}",
-                    searchDto.getOrderDtStart(), searchDto.getOrderDtEnd(), 
-                    searchDto.getCustomerName(), searchDto.getDeliveryStatus(), searchDto.getHqCode());
-            
-            List<Order> orders = orderRepository.findBySearchConditionsWithHqCode(
-                    searchDto.getOrderDtStart(),
-                    searchDto.getOrderDtEnd(),
-                    searchDto.getCustomerName(),
-                    searchDto.getDeliveryStatus(),
-                    searchDto.getHqCode()
-            );
-            
-            List<OrderRespDto> responseList = orders.stream()
-                    .map(OrderRespDto::fromEntity)
-                    .collect(Collectors.toList());
-            
-            log.info("주문 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
-            return RespDto.success("주문 목록 조회 성공", responseList);
-            
-        } catch (Exception e) {
-            log.error("주문 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
-            return RespDto.fail("주문 목록 조회 중 오류가 발생했습니다.");
-        }
-    }
-
-    /**
-     * 주문품목 목록 조회
-     */
-    @Transactional(readOnly = true)
-    public RespDto<List<OrderItemRespDto>> getOrderItemList(String orderNo) {
-        try {
-            log.info("주문품목 목록 조회 시작 - orderNo: {}", orderNo);
-            
-            List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderNo);
-            
-            List<OrderItemRespDto> responseList = orderItems.stream()
-                    .map(OrderItemRespDto::fromEntity)
-                    .collect(Collectors.toList());
-            
-            return RespDto.success("주문품목 목록 조회 성공", responseList);
-            
-        } catch (Exception e) {
-            log.error("주문품목 목록 조회 중 오류 발생", e);
-            return RespDto.fail("주문품목 목록 조회 중 오류가 발생했습니다.");
         }
     }
 

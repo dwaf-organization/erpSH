@@ -30,12 +30,13 @@ public class CustomerLedgerService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerLedgerSummaryRespDto>> getCustomerLedgerSummary(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            log.info("거래처별원장 집계 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처별원장 집계 조회 시작 - hqCode: {}, 주문상태: {}, 조건: {}", 
+                    searchDto.getHqCode(), searchDto.getOrderStatus(), searchDto);
             
             List<CustomerLedgerSummaryRespDto> resultList = new ArrayList<>();
             
-            // 주문상태에 따른 데이터 조회
-            if ("전체".equals(searchDto.getOrderStatus()) || searchDto.getOrderStatus() == null) {
+            // 주문상태에 따른 데이터 조회 (빈값은 전체 조회)
+            if (searchDto.getOrderStatus() == null || searchDto.getOrderStatus().isEmpty()) {
                 // 전체 조회: 주문 + 배송 + 반품
                 resultList.addAll(getOrderSummary(searchDto));
                 resultList.addAll(getDeliverySummary(searchDto));
@@ -54,11 +55,11 @@ public class CustomerLedgerService {
                 resultList.addAll(getReturnSummary(searchDto));
             }
             
-            log.info("거래처별원장 집계 조회 완료 - 조회 건수: {}", resultList.size());
+            log.info("거래처별원장 집계 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), resultList.size());
             return RespDto.success("거래처별원장 집계 조회 성공", resultList);
             
         } catch (Exception e) {
-            log.error("거래처별원장 집계 조회 중 오류 발생", e);
+            log.error("거래처별원장 집계 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처별원장 집계 조회 중 오류가 발생했습니다.");
         }
     }
@@ -68,12 +69,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerSummaryRespDto> getOrderSummary(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderSummary(
+            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderSummaryWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerSummaryRespDto> orderList = new ArrayList<>();
@@ -112,12 +114,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerSummaryRespDto> getDeliverySummary(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliverySummary(
+            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliverySummaryWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerSummaryRespDto> deliveryList = new ArrayList<>();
@@ -156,12 +159,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerSummaryRespDto> getReturnSummary(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnSummary(
+            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnSummaryWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerSummaryRespDto> returnList = new ArrayList<>();
@@ -202,12 +206,13 @@ public class CustomerLedgerService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerLedgerDetailRespDto>> getCustomerLedgerDetail(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            log.info("거래처별원장 세부 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처별원장 세부 조회 시작 - hqCode: {}, 주문상태: {}, 조건: {}", 
+                    searchDto.getHqCode(), searchDto.getOrderStatus(), searchDto);
             
             List<CustomerLedgerDetailRespDto> resultList = new ArrayList<>();
             
-            // 주문상태에 따른 데이터 조회
-            if ("전체".equals(searchDto.getOrderStatus()) || searchDto.getOrderStatus() == null) {
+            // 주문상태에 따른 데이터 조회 (빈값은 전체 조회)
+            if (searchDto.getOrderStatus() == null || searchDto.getOrderStatus().isEmpty()) {
                 // 전체 조회: 주문 + 배송 + 반품
                 resultList.addAll(getOrderDetail(searchDto));
                 resultList.addAll(getDeliveryDetail(searchDto));
@@ -226,11 +231,11 @@ public class CustomerLedgerService {
                 resultList.addAll(getReturnDetail(searchDto));
             }
             
-            log.info("거래처별원장 세부 조회 완료 - 조회 건수: {}", resultList.size());
+            log.info("거래처별원장 세부 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), resultList.size());
             return RespDto.success("거래처별원장 세부 조회 성공", resultList);
             
         } catch (Exception e) {
-            log.error("거래처별원장 세부 조회 중 오류 발생", e);
+            log.error("거래처별원장 세부 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처별원장 세부 조회 중 오류가 발생했습니다.");
         }
     }
@@ -240,12 +245,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDetailRespDto> getOrderDetail(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderDetail(
+            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderDetailWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDetailRespDto> orderList = new ArrayList<>();
@@ -286,12 +292,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDetailRespDto> getDeliveryDetail(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliveryDetail(
+            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliveryDetailWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDetailRespDto> deliveryList = new ArrayList<>();
@@ -332,12 +339,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDetailRespDto> getReturnDetail(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnDetail(
+            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnDetailWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDetailRespDto> returnList = new ArrayList<>();
@@ -380,12 +388,13 @@ public class CustomerLedgerService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerLedgerDailyRespDto>> getCustomerLedgerDaily(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            log.info("거래처별원장 일자별 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처별원장 일자별 조회 시작 - hqCode: {}, 주문상태: {}, 조건: {}", 
+                    searchDto.getHqCode(), searchDto.getOrderStatus(), searchDto);
             
             List<CustomerLedgerDailyRespDto> resultList = new ArrayList<>();
             
-            // 주문상태에 따른 데이터 조회
-            if ("전체".equals(searchDto.getOrderStatus()) || searchDto.getOrderStatus() == null) {
+            // 주문상태에 따른 데이터 조회 (빈값은 전체 조회)
+            if (searchDto.getOrderStatus() == null || searchDto.getOrderStatus().isEmpty()) {
                 // 전체 조회: 주문 + 배송 + 반품
                 resultList.addAll(getOrderDaily(searchDto));
                 resultList.addAll(getDeliveryDaily(searchDto));
@@ -404,11 +413,11 @@ public class CustomerLedgerService {
                 resultList.addAll(getReturnDaily(searchDto));
             }
             
-            log.info("거래처별원장 일자별 조회 완료 - 조회 건수: {}", resultList.size());
+            log.info("거래처별원장 일자별 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), resultList.size());
             return RespDto.success("거래처별원장 일자별 조회 성공", resultList);
             
         } catch (Exception e) {
-            log.error("거래처별원장 일자별 조회 중 오류 발생", e);
+            log.error("거래처별원장 일자별 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처별원장 일자별 조회 중 오류가 발생했습니다.");
         }
     }
@@ -418,12 +427,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDailyRespDto> getOrderDaily(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderDaily(
+            List<Object[]> orderResults = orderRepository.findCustomerLedgerOrderDailyWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDailyRespDto> orderList = new ArrayList<>();
@@ -465,12 +475,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDailyRespDto> getDeliveryDaily(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliveryDaily(
+            List<Object[]> deliveryResults = orderRepository.findCustomerLedgerDeliveryDailyWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDailyRespDto> deliveryList = new ArrayList<>();
@@ -512,12 +523,13 @@ public class CustomerLedgerService {
      */
     private List<CustomerLedgerDailyRespDto> getReturnDaily(CustomerLedgerSummarySearchDto searchDto) {
         try {
-            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnDaily(
+            List<Object[]> returnResults = returnRepository.findCustomerLedgerReturnDailyWithHqCode(
                     searchDto.getDeliveryRequestDtStart(),
                     searchDto.getDeliveryRequestDtEnd(),
                     searchDto.getItemCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerLedgerDailyRespDto> returnList = new ArrayList<>();

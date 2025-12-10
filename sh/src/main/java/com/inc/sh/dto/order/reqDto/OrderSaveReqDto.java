@@ -35,7 +35,5 @@ public class OrderSaveReqDto {
         private String vehicleName;                 // 차량명 (자동 조회)
         private String deliveryDt;                  // 배송일자 (배송중일 때 order_dt와 동일)
         
-        // 충전형 주문시 필요한 금액 정보
-        private Integer totalAmt;                   // 총 주문금액 (잔액 체크용)
     }
 }

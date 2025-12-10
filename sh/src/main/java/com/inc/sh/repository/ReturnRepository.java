@@ -30,7 +30,7 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
      * 진행상태별 반품 조회
      */
     List<Return> findByProgressStatus(String progressStatus);
-    
+
     /**
      * 거래처별원장용 반품 집계 조회
      */
@@ -67,6 +67,47 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
         @Param("itemCode") Integer itemCode,
         @Param("brandCode") Integer brandCode,
         @Param("customerCode") Integer customerCode
+    );
+    
+    /**
+     * 거래처별원장용 반품 집계 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "r.return_customer_code as customer_code, " +
+           "r.return_customer_name as customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "'반품' as order_type, " +
+           "SUM(r.qty) as total_qty, " +
+           "0 as tax_free_amt, " +
+           "SUM(r.supply_price) as taxable_amt, " +
+           "SUM(r.supply_price) as supply_amt, " +
+           "SUM(r.vat_amt) as vat_amt, " +
+           "SUM(r.total_amt) as total_amt, " +
+           "SUM(r.qty) as delivery_qty, " +
+           "SUM(r.supply_price) as delivery_supply_amt, " +
+           "SUM(r.vat_amt) as delivery_vat_amt, " +
+           "SUM(r.total_amt) as delivery_total_amt " +
+           "FROM `return` r " +
+           "JOIN customer c ON r.return_customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN `order` o ON r.order_no = o.order_no " +
+           "WHERE " +
+           "(:deliveryRequestDtStart IS NULL OR r.return_request_dt >= :deliveryRequestDtStart) AND " +
+           "(:deliveryRequestDtEnd IS NULL OR r.return_request_dt <= :deliveryRequestDtEnd) AND " +
+           "(:itemCode IS NULL OR r.item_code = :itemCode) AND " +
+           "(:brandCode IS NULL OR c.brand_code = :brandCode) AND " +
+           "(:customerCode IS NULL OR r.return_customer_code = :customerCode) AND " +
+           "o.hq_code = :hqCode " +
+           "GROUP BY r.return_customer_code, r.return_customer_name, b.brand_name, c.tel_num " +
+           "ORDER BY r.return_customer_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerReturnSummaryWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
@@ -110,6 +151,49 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
     );
     
     /**
+     * 거래처별원장용 반품 세부 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "r.return_customer_code as customer_code, " +
+           "r.return_customer_name as customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "r.item_code, " +
+           "r.item_name, " +
+           "r.specification, " +
+           "r.unit, " +
+           "'반품' as order_type, " +
+           "SUM(r.qty) as total_qty, " +
+           "SUM(r.supply_price) as supply_amt, " +
+           "SUM(r.vat_amt) as vat_amt, " +
+           "SUM(r.total_amt) as total_amt, " +
+           "SUM(r.qty) as delivery_qty, " +
+           "SUM(r.supply_price) as delivery_supply_amt, " +
+           "SUM(r.vat_amt) as delivery_vat_amt, " +
+           "SUM(r.total_amt) as delivery_total_amt " +
+           "FROM `return` r " +
+           "JOIN customer c ON r.return_customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN `order` o ON r.order_no = o.order_no " +
+           "WHERE " +
+           "(:deliveryRequestDtStart IS NULL OR r.return_request_dt >= :deliveryRequestDtStart) AND " +
+           "(:deliveryRequestDtEnd IS NULL OR r.return_request_dt <= :deliveryRequestDtEnd) AND " +
+           "(:itemCode IS NULL OR r.item_code = :itemCode) AND " +
+           "(:brandCode IS NULL OR c.brand_code = :brandCode) AND " +
+           "(:customerCode IS NULL OR r.return_customer_code = :customerCode) AND " +
+           "o.hq_code = :hqCode " +
+           "GROUP BY r.return_customer_code, r.return_customer_name, b.brand_name, c.tel_num, r.item_code, r.item_name, r.specification, r.unit " +
+           "ORDER BY r.return_customer_code, r.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerReturnDetailWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 거래처별원장용 반품 일자별 조회
      */
     @Query(value = "SELECT " +
@@ -148,6 +232,50 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
         @Param("itemCode") Integer itemCode,
         @Param("brandCode") Integer brandCode,
         @Param("customerCode") Integer customerCode
+    );
+    
+    /**
+     * 거래처별원장용 반품 일자별 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "r.return_request_dt as order_date, " +
+           "r.return_customer_code as customer_code, " +
+           "r.return_customer_name as customer_name, " +
+           "b.brand_name, " +
+           "c.tel_num, " +
+           "r.item_code, " +
+           "r.item_name, " +
+           "r.specification, " +
+           "r.unit, " +
+           "'반품' as order_type, " +
+           "SUM(r.qty) as total_qty, " +
+           "SUM(r.supply_price) as supply_amt, " +
+           "SUM(r.vat_amt) as vat_amt, " +
+           "SUM(r.total_amt) as total_amt, " +
+           "SUM(r.qty) as delivery_qty, " +
+           "SUM(r.supply_price) as delivery_supply_amt, " +
+           "SUM(r.vat_amt) as delivery_vat_amt, " +
+           "SUM(r.total_amt) as delivery_total_amt " +
+           "FROM `return` r " +
+           "JOIN customer c ON r.return_customer_code = c.customer_code " +
+           "JOIN brand_info b ON c.brand_code = b.brand_code " +
+           "LEFT JOIN `order` o ON r.order_no = o.order_no " +
+           "WHERE " +
+           "(:deliveryRequestDtStart IS NULL OR r.return_request_dt >= :deliveryRequestDtStart) AND " +
+           "(:deliveryRequestDtEnd IS NULL OR r.return_request_dt <= :deliveryRequestDtEnd) AND " +
+           "(:itemCode IS NULL OR r.item_code = :itemCode) AND " +
+           "(:brandCode IS NULL OR c.brand_code = :brandCode) AND " +
+           "(:customerCode IS NULL OR r.return_customer_code = :customerCode) AND " +
+           "o.hq_code = :hqCode " +
+           "GROUP BY r.return_request_dt, r.return_customer_code, r.return_customer_name, b.brand_name, c.tel_num, r.item_code, r.item_name, r.specification, r.unit " +
+           "ORDER BY r.return_request_dt, r.return_customer_code, r.item_code", nativeQuery = true)
+    List<Object[]> findCustomerLedgerReturnDailyWithHqCode(
+        @Param("deliveryRequestDtStart") String deliveryRequestDtStart,
+        @Param("deliveryRequestDtEnd") String deliveryRequestDtEnd,
+        @Param("itemCode") Integer itemCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
     
     /**
