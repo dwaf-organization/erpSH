@@ -20,6 +20,7 @@ public class OrderSaveReqDto {
     @Builder
     public static class OrderSaveItemDto {
         private String orderNo;                     // null=CREATE, 값=UPDATE
+        private Integer hqCode;                     // 본사코드 (필수)
         private Integer customerCode;               // 거래처코드 (필수)
         private String orderDt;                     // 주문일자 (yyyyMMdd) (필수)
         private String deliveryRequestDt;           // 납기요청일 (yyyyMMdd) (필수)

@@ -33,6 +33,22 @@ public interface DeliveryHolidayRepository extends JpaRepository<DeliveryHoliday
     List<Object[]> findHolidaysWithBrandName(@Param("brandCode") Integer brandCode);
     
     /**
+     * 브랜드별 배송휴일 조회 (브랜드명 포함, 본사별)
+     * @param brandCode 브랜드코드 (null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 배송휴일 목록 (브랜드명, 휴일, 요일 포함)
+     */
+    @Query("SELECT dh.deliveryHolidayCode, b.brandName, dh.holidayDt, dh.weekday, dh.holidayName " +
+           "FROM DeliveryHoliday dh LEFT JOIN BrandInfo b ON dh.brandCode = b.brandCode " +
+           "WHERE (:brandCode IS NULL OR dh.brandCode = :brandCode) AND " +
+           "dh.hqCode = :hqCode " +
+           "ORDER BY dh.brandCode ASC, dh.holidayDt ASC")
+    List<Object[]> findHolidaysWithBrandNameAndHqCode(
+        @Param("brandCode") Integer brandCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 브랜드별 배송휴일 조회
      */
     List<DeliveryHoliday> findByBrandCode(Integer brandCode);

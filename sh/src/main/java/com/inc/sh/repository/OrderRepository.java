@@ -67,6 +67,25 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     );
     
     /**
+     * 주문 조회 (본사별)
+     */
+    @Query(value = "SELECT o.* FROM `order` o " +
+           "WHERE " +
+           "(:orderDtStart IS NULL OR o.order_dt >= :orderDtStart) AND " +
+           "(:orderDtEnd IS NULL OR o.order_dt <= :orderDtEnd) AND " +
+           "(:customerName IS NULL OR o.customer_name LIKE CONCAT('%', :customerName, '%')) AND " +
+           "(:deliveryStatus IS NULL OR o.delivery_status = :deliveryStatus) AND " +
+           "o.hq_code = :hqCode " +
+           "ORDER BY o.order_dt DESC, o.order_no DESC", nativeQuery = true)
+    List<Order> findBySearchConditionsWithHqCode(
+        @Param("orderDtStart") String orderDtStart,
+        @Param("orderDtEnd") String orderDtEnd,
+        @Param("customerName") String customerName,
+        @Param("deliveryStatus") String deliveryStatus,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 오늘 날짜의 최신 주문번호 조회 (순번 생성용)
      */
     @Query(value = "SELECT o.order_no FROM `order` o " +

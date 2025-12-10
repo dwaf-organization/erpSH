@@ -178,9 +178,7 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
            "r.note, " +                           // 21
            "r.return_message, " +                 // 22
            "r.warehouse_name as stored_warehouse_name, " +  // 23
-           "r.description, " +                    // 24
-           "r.created_at, " +                     // 25
-           "r.updated_at " +                      // 26
+           "r.order_no as order_no " +            // 24
            "FROM `return` r " +
            "LEFT JOIN customer c ON r.return_customer_code = c.customer_code " +
            "LEFT JOIN warehouse w ON r.receive_warehouse_code = w.warehouse_code " +
@@ -196,6 +194,55 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
         @Param("endDate") String endDate,
         @Param("customerCode") Integer customerCode,
         @Param("status") String status
+    );
+    
+    /**
+     * 반품등록처리 - 검색 조건으로 반품 목록 조회 (본사별, order 테이블 조인)
+     */
+    @Query(value = "SELECT " +
+           "r.return_no, " +                      // 0
+           "r.return_customer_code, " +           // 1
+           "c.customer_name, " +                  // 2
+           "r.return_request_dt, " +              // 3
+           "r.item_code, " +                      // 4
+           "r.item_name, " +                      // 5
+           "r.specification, " +                  // 6
+           "r.unit, " +                           // 7
+           "r.price_type, " +                     // 8
+           "r.qty, " +                            // 9
+           "r.unit_price, " +                     // 10
+           "r.supply_price, " +                   // 11
+           "r.vat_amt, " +                        // 12
+           "r.total_amt, " +                      // 13
+           "r.receive_warehouse_code, " +         // 14
+           "w.warehouse_name, " +                 // 15
+           "dc.dist_center_code, " +              // 16
+           "dc.dist_center_name, " +              // 17
+           "r.progress_status, " +                // 18
+           "r.return_approve_dt, " +              // 19
+           "r.reply_message, " +                  // 20
+           "r.note, " +                           // 21
+           "r.return_message, " +                 // 22
+           "r.warehouse_name as stored_warehouse_name, " +  // 23
+           "r.order_no as order_no " +            // 24
+           "FROM `return` r " +
+           "LEFT JOIN customer c ON r.return_customer_code = c.customer_code " +
+           "LEFT JOIN warehouse w ON r.receive_warehouse_code = w.warehouse_code " +
+           "LEFT JOIN dist_center dc ON w.dist_center_code = dc.dist_center_code " +
+           "LEFT JOIN `order` o ON r.order_no = o.order_no " +  // order 테이블 조인
+           "WHERE " +
+           "(:startDate IS NULL OR r.return_request_dt >= :startDate) AND " +
+           "(:endDate IS NULL OR r.return_request_dt <= :endDate) AND " +
+           "(:customerCode IS NULL OR r.return_customer_code = :customerCode) AND " +
+           "(:status IS NULL OR r.progress_status = :status) AND " +
+           "o.hq_code = :hqCode " +               // 본사코드 필터링
+           "ORDER BY r.return_request_dt DESC, r.return_no DESC", nativeQuery = true)
+    List<Object[]> findReturnsWithJoinByConditionsAndHqCode(
+        @Param("startDate") String startDate,
+        @Param("endDate") String endDate,
+        @Param("customerCode") Integer customerCode,
+        @Param("status") String status,
+        @Param("hqCode") Integer hqCode
     );
     
     /**

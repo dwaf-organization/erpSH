@@ -31,16 +31,18 @@ public class OrderController {
             @RequestParam(value = "orderDtStart", required = false) String orderDtStart,
             @RequestParam(value = "orderDtEnd", required = false) String orderDtEnd,
             @RequestParam(value = "customerName", required = false) String customerName,
-            @RequestParam(value = "deliveryStatus", required = false) String deliveryStatus) {
+            @RequestParam(value = "deliveryStatus", required = false) String deliveryStatus,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("주문 목록 조회 요청 - orderDtStart: {}, orderDtEnd: {}, customerName: {}, deliveryStatus: {}", 
-                orderDtStart, orderDtEnd, customerName, deliveryStatus);
+        log.info("주문 목록 조회 요청 - orderDtStart: {}, orderDtEnd: {}, customerName: {}, deliveryStatus: {}, hqCode: {}", 
+                orderDtStart, orderDtEnd, customerName, deliveryStatus, hqCode);
         
         OrderSearchDto searchDto = OrderSearchDto.builder()
                 .orderDtStart(orderDtStart)
                 .orderDtEnd(orderDtEnd)
                 .customerName(customerName)
                 .deliveryStatus(deliveryStatus)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<OrderRespDto>> response = orderService.getOrderList(searchDto);
@@ -89,6 +91,10 @@ public class OrderController {
         
         // 개별 항목 필수 필드 검증
         for (OrderSaveReqDto.OrderSaveItemDto order : request.getOrders()) {
+            if (order.getHqCode() == null) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("본사코드는 필수입니다."));
+            }
             if (order.getCustomerCode() == null) {
                 return ResponseEntity.badRequest()
                         .body(RespDto.fail("거래처코드는 필수입니다."));

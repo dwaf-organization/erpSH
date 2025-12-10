@@ -15,6 +15,7 @@ public class OrderCreateReqDto {
     
     // 기본 주문 정보
     private Integer customerCode;
+    private Integer hqCode;
     private Integer customerUserCode;
     private String deliveryRequestDt;  // 납기요청일 (YYYYMMDD)
     private String orderMessage;       // 주문메시지

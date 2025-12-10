@@ -1,8 +1,10 @@
 package com.inc.sh.controller;
 
 import com.inc.sh.dto.popup.reqDto.ItemSearchPopupDto;
+import com.inc.sh.dto.popup.reqDto.CustomerItemSearchDto;
 import com.inc.sh.dto.popup.reqDto.CustomerSearchPopupDto;
 import com.inc.sh.dto.popup.reqDto.VirtualAccountSearchPopupDto;
+import com.inc.sh.dto.popup.respDto.CustomerItemRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.item.respDto.ItemRespDto;
 import com.inc.sh.dto.customer.respDto.CustomerRespDto;
@@ -29,17 +31,17 @@ public class PopupController {
      */
     @GetMapping("/item-search")
     public ResponseEntity<RespDto<List<ItemRespDto>>> searchItems(
-            @RequestParam(value = "itemCode", required = false) String itemCode,
-            @RequestParam(value = "itemName", required = false) String itemName,
+    		@RequestParam("hqCode") Integer hqCode,
+            @RequestParam(value = "item", required = false) String item,
             @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
             @RequestParam(value = "priceType", required = false) Integer priceType) {
         
-        log.info("품목 팝업 검색 요청 - itemCode: {}, itemName: {}, categoryCode: {}, priceType: {}", 
-                itemCode, itemName, categoryCode, priceType);
+        log.info("품목 팝업 검색 요청 - item: {}, categoryCode: {}, priceType: {}", 
+                item, categoryCode, priceType);
         
         ItemSearchPopupDto searchDto = ItemSearchPopupDto.builder()
-                .itemCode(itemCode)
-                .itemName(itemName)
+                .hqCode(hqCode)
+                .item(item)
                 .categoryCode(categoryCode)
                 .priceType(priceType)
                 .build();
@@ -108,4 +110,39 @@ public class PopupController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+    
+    /**
+     * 거래처품목조회 팝업
+     * GET /api/v1/erp/popup/customer/item-search
+     */
+    @GetMapping("/customer/item-search")
+    public ResponseEntity<RespDto<List<CustomerItemRespDto>>> searchCustomerItems(
+            @RequestParam("hqCode") Integer hqCode,
+            @RequestParam("customerCode") Integer customerCode,
+            @RequestParam(value = "item", required = false) String item,
+            @RequestParam(value = "warehouseCode", required = false) Integer warehouseCode,
+            @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
+            @RequestParam(value = "priceType", required = false) Integer priceType) {
+        
+        log.info("거래처품목조회 팝업 요청 - hqCode: {}, customerCode: {}, item: {}, warehouseCode: {}, categoryCode: {}, priceType: {}", 
+                hqCode, customerCode, item, warehouseCode, categoryCode, priceType);
+        
+        CustomerItemSearchDto searchDto = CustomerItemSearchDto.builder()
+                .hqCode(hqCode)
+                .customerCode(customerCode)
+                .item(item)
+                .warehouseCode(warehouseCode)
+                .categoryCode(categoryCode)
+                .priceType(priceType)
+                .build();
+        
+        RespDto<List<CustomerItemRespDto>> response = popupService.searchCustomerItems(searchDto);
+        
+        if (response.getCode() == 1) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
 }

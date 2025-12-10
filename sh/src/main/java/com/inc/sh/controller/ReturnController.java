@@ -42,16 +42,18 @@ public class ReturnController {
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
-            @RequestParam(value = "status", required = false) String status) {
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("반품 조회 요청 - 기간: {} ~ {}, 거래처코드: {}, 진행상태: {}", 
-                startDate, endDate, customerCode, status);
+        log.info("반품 조회 요청 - 기간: {} ~ {}, 거래처코드: {}, 진행상태: {}, hqCode: {}", 
+                startDate, endDate, customerCode, status, hqCode);
         
         ReturnSearchDto searchDto = ReturnSearchDto.builder()
                 .startDate(startDate)
                 .endDate(endDate)
                 .customerCode(customerCode)
                 .status(status)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<ReturnRespDto>> response = returnManagementService.getReturnList(searchDto);

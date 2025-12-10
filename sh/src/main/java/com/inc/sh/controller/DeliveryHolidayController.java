@@ -33,12 +33,14 @@ public class DeliveryHolidayController {
      */
     @GetMapping("/list")
     public ResponseEntity<RespDto<List<DeliveryHolidayRespDto>>> getDeliveryHolidayList(
-            @RequestParam(value = "brandCode", required = false) Integer brandCode) {
+            @RequestParam(value = "brandCode", required = false) Integer brandCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("배송휴일 목록 조회 요청 - brandCode: {}", brandCode);
+        log.info("배송휴일 목록 조회 요청 - brandCode: {}, hqCode: {}", brandCode, hqCode);
         
         DeliveryHolidaySearchDto searchDto = DeliveryHolidaySearchDto.builder()
                 .brandCode(brandCode)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<DeliveryHolidayRespDto>> response = deliveryHolidayService.getDeliveryHolidayList(searchDto);

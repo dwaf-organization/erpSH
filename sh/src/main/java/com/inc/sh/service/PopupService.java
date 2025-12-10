@@ -1,15 +1,15 @@
 package com.inc.sh.service;
 
 import com.inc.sh.dto.popup.reqDto.ItemSearchPopupDto;
+import com.inc.sh.dto.popup.reqDto.CustomerItemSearchDto;
 import com.inc.sh.dto.popup.reqDto.CustomerSearchPopupDto;
 import com.inc.sh.dto.popup.reqDto.VirtualAccountSearchPopupDto;
+import com.inc.sh.dto.popup.respDto.CustomerItemRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.item.respDto.ItemRespDto;
 import com.inc.sh.dto.customer.respDto.CustomerRespDto;
 import com.inc.sh.dto.virtualAccount.respDto.VirtualAccountRespDto;
 import com.inc.sh.entity.Item;
-import com.inc.sh.entity.Customer;
-import com.inc.sh.entity.VirtualAccount;
 import com.inc.sh.repository.ItemRepository;
 import com.inc.sh.repository.CustomerRepository;
 import com.inc.sh.repository.VirtualAccountRepository;
@@ -41,12 +41,12 @@ public class PopupService {
      */
     public RespDto<List<ItemRespDto>> searchItems(ItemSearchPopupDto searchDto) {
         try {
-            log.info("품목 팝업 검색 시작 - itemCode: {}, itemName: {}, categoryCode: {}, priceType: {}", 
-                    searchDto.getItemCode(), searchDto.getItemName(), searchDto.getCategoryCode(), searchDto.getPriceType());
+            log.info("품목 팝업 검색 시작 - hqCode: {}, item: {}, categoryCode: {}, priceType: {}", 
+            		searchDto.getHqCode(), searchDto.getItem(), searchDto.getCategoryCode(), searchDto.getPriceType());
             
             List<Item> items = itemRepository.findByPopupSearchConditions(
-                    searchDto.getItemCode(),
-                    searchDto.getItemName(),
+            		searchDto.getHqCode(),
+                    searchDto.getItem(),
                     searchDto.getCategoryCode(),
                     searchDto.getPriceType()
             );
@@ -264,5 +264,101 @@ public class PopupService {
             log.error("가상계좌 팝업 검색 중 오류 발생", e);
             return RespDto.fail("가상계좌 검색 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 거래처품목조회 팝업
+     */
+    @Transactional(readOnly = true)
+    public RespDto<List<CustomerItemRespDto>> searchCustomerItems(CustomerItemSearchDto searchDto) {
+        try {
+            log.info("거래처품목 팝업 조회 시작 - hqCode: {}, customerCode: {}, item: {}", 
+                    searchDto.getHqCode(), searchDto.getCustomerCode(), searchDto.getItem());
+            
+            // 필수 파라미터 검증
+            if (searchDto.getHqCode() == null) {
+                return RespDto.fail("본사코드는 필수입니다.");
+            }
+            if (searchDto.getCustomerCode() == null) {
+                return RespDto.fail("거래처코드는 필수입니다.");
+            }
+            
+            // 복합 조인 조회 (기존 CustomerRepository 사용)
+            List<Object[]> results = customerRepository.findCustomerItemsWithPrice(
+                    searchDto.getHqCode(),
+                    searchDto.getCustomerCode(),
+                    searchDto.getItem(),
+                    searchDto.getWarehouseCode(),
+                    searchDto.getCategoryCode(),
+                    searchDto.getPriceType()
+            );
+            
+            // Object[] → DTO 변환
+            List<CustomerItemRespDto> responseList = results.stream()
+                    .map(this::convertToCustomerItemRespDto)
+                    .collect(Collectors.toList());
+            
+            log.info("거래처품목 팝업 조회 완료 - 조회 건수: {}", responseList.size());
+            return RespDto.success("거래처품목 조회 성공", responseList);
+            
+        } catch (Exception e) {
+            log.error("거래처품목 팝업 조회 중 오류 발생", e);
+            return RespDto.fail("거래처품목 조회 중 오류가 발생했습니다.");
+        }
+    }
+    
+    /**
+     * Object[] → CustomerItemRespDto 변환
+     */
+    private CustomerItemRespDto convertToCustomerItemRespDto(Object[] result) {
+        return CustomerItemRespDto.builder()
+                .itemCode(safeIntegerCast(result[0]))
+                .itemName(safeStringCast(result[1]))
+                .specification(safeStringCast(result[2]))
+                .purchaseUnit(safeStringCast(result[3]))
+                .vatType(safeStringCast(result[4]))
+                .vatDetail(safeStringCast(result[5]))
+                .origin(safeStringCast(result[6]))
+                .categoryCode(safeIntegerCast(result[7]))
+                .categoryName(safeStringCast(result[8]))
+                .warehouseCode(safeIntegerCast(result[9]))
+                .warehouseName(safeStringCast(result[10]))
+                .currentQuantity(safeIntegerCast(result[11]))
+                .safeQuantity(safeIntegerCast(result[12]))
+                // 가격 정보 (거래처별 or 기본가격)
+                .basePrice(safeIntegerCast(result[13]))
+                .supplyPrice(safeIntegerCast(result[14]))
+                .taxAmount(safeIntegerCast(result[15]))
+                .taxableAmount(safeIntegerCast(result[16]))
+                .dutyFreeAmount(safeIntegerCast(result[17]))
+                .totalAmount(safeIntegerCast(result[18]))
+                .orderAvailableYn(safeIntegerCast(result[19]))
+                .minOrderQty(safeIntegerCast(result[20]))
+                .maxOrderQty(safeIntegerCast(result[21]))
+                .deadlineDay(safeIntegerCast(result[22]))
+                .deadlineTime(safeStringCast(result[23]))
+                .build();
+    }
+    
+    /**
+     * 안전한 Integer 캐스팅
+     */
+    private Integer safeIntegerCast(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Integer) return (Integer) obj;
+        if (obj instanceof Number) return ((Number) obj).intValue();
+        try {
+            return Integer.valueOf(obj.toString());
+        } catch (NumberFormatException e) {
+            log.warn("Integer 캐스팅 실패: {}", obj);
+            return null;
+        }
+    }
+    
+    /**
+     * 안전한 String 캐스팅
+     */
+    private String safeStringCast(Object obj) {
+        return obj != null ? obj.toString() : null;
     }
 }

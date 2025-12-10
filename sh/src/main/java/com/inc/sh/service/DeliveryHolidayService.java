@@ -46,19 +46,23 @@ public class DeliveryHolidayService {
     @Transactional(readOnly = true)
     public RespDto<List<DeliveryHolidayRespDto>> getDeliveryHolidayList(DeliveryHolidaySearchDto searchDto) {
         try {
-            log.info("배송휴일 목록 조회 시작 - brandCode: {}", searchDto.getBrandCode());
+            log.info("배송휴일 목록 조회 시작 - brandCode: {}, hqCode: {}", 
+                    searchDto.getBrandCode(), searchDto.getHqCode());
             
-            List<Object[]> holidays = deliveryHolidayRepository.findHolidaysWithBrandName(searchDto.getBrandCode());
+            List<Object[]> holidays = deliveryHolidayRepository.findHolidaysWithBrandNameAndHqCode(
+                    searchDto.getBrandCode(), 
+                    searchDto.getHqCode()
+            );
             
             List<DeliveryHolidayRespDto> responseList = holidays.stream()
                     .map(DeliveryHolidayRespDto::of)
                     .collect(Collectors.toList());
             
-            log.info("배송휴일 목록 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("배송휴일 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("배송휴일 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("배송휴일 목록 조회 중 오류 발생", e);
+            log.error("배송휴일 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("배송휴일 목록 조회 중 오류가 발생했습니다.");
         }
     }

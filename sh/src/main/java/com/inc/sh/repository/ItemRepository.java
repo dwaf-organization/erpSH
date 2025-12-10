@@ -185,28 +185,25 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
     );
     
     /**
-     * 품명으로 조회 (부분 일치)
-     */
-    @Query("SELECT i FROM Item i WHERE i.itemName LIKE %:itemName% ORDER BY i.itemCode DESC")
-    List<Item> findByItemNameContaining(@Param("itemName") String itemName);
-    
-    /**
-     * 팝업용 품목 검색
-     * @param itemCode 품목코드 (부분일치, null 가능)
-     * @param itemName 품명 (부분일치, null 가능)
+     * 팝업용 품목 검색 (수정됨)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @param item 품목코드/품명 (부분일치, null 가능)
      * @param categoryCode 분류코드 (완전일치, null 가능)
      * @param priceType 단가유형 (완전일치, null 가능)
      * @return 조회된 품목 목록
      */
-    @Query(value = "SELECT * FROM item i WHERE " +
-           "(:itemCode IS NULL OR CAST(i.item_code AS CHAR) LIKE CONCAT('%', :itemCode, '%')) AND " +
-           "(:itemName IS NULL OR i.item_name LIKE CONCAT('%', :itemName, '%')) AND " +
-           "(:categoryCode IS NULL OR i.category_code = :categoryCode) AND " +
-           "(:priceType IS NULL OR i.price_type = :priceType) " +
+    @Query(value = "SELECT * FROM item i " +
+           "WHERE i.hq_code = :hqCode " +
+           "AND (:item IS NULL OR " +
+           "     CAST(i.item_code AS CHAR) LIKE CONCAT('%', :item, '%') OR " +
+           "     i.item_name LIKE CONCAT('%', :item, '%')) " +
+           "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
+           "AND (:priceType IS NULL OR i.price_type = :priceType) " +
+           "AND i.order_available_yn = 1 " +  // 주문가능 품목만
            "ORDER BY i.item_code ASC", nativeQuery = true)
     List<Item> findByPopupSearchConditions(
-        @Param("itemCode") String itemCode,
-        @Param("itemName") String itemName,
+        @Param("hqCode") Integer hqCode,
+        @Param("item") String item,
         @Param("categoryCode") Integer categoryCode,
         @Param("priceType") Integer priceType
     );

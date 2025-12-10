@@ -51,13 +51,16 @@ public class ReturnManagementService {
     @Transactional(readOnly = true)
     public RespDto<List<ReturnRespDto>> getReturnList(ReturnSearchDto searchDto) {
         try {
-            log.info("반품 조회 시작 - 조건: {}", searchDto);
+            log.info("반품 조회 시작 - 조건: startDate: {}, endDate: {}, customerCode: {}, status: {}, hqCode: {}", 
+                    searchDto.getStartDate(), searchDto.getEndDate(), searchDto.getCustomerCode(), 
+                    searchDto.getStatus(), searchDto.getHqCode());
             
-            List<Object[]> results = returnRepository.findReturnsWithJoinByConditions(
+            List<Object[]> results = returnRepository.findReturnsWithJoinByConditionsAndHqCode(
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
                     searchDto.getCustomerCode(),
-                    searchDto.getStatus()
+                    searchDto.getStatus(),
+                    searchDto.getHqCode()
             );
             
             List<ReturnRespDto> returnList = results.stream()
@@ -84,19 +87,17 @@ public class ReturnManagementService {
                                 .returnApprovalDate((String) result[19])
                                 .message((String) result[20])
                                 .note((String) result[21])
-                                .description((String) result[23])
-                                .createdAt(result[24] != null ? result[24].toString() : null)
-                                .updatedAt(result[25] != null ? result[25].toString() : null)
+                                .orderNo((String) result[24])
                                 .build();
                         return dto;
                     })
                     .collect(Collectors.toList());
             
-            log.info("반품 조회 완료 - 조회 건수: {}", returnList.size());
+            log.info("반품 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), returnList.size());
             return RespDto.success("반품 조회 성공", returnList);
             
         } catch (Exception e) {
-            log.error("반품 조회 중 오류 발생", e);
+            log.error("반품 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("반품 조회 중 오류가 발생했습니다.");
         }
     }
@@ -406,9 +407,7 @@ public class ReturnManagementService {
                 .returnMessage(returnEntity.getReturnMessage())
                 .message(returnEntity.getReplyMessage())
                 .note(returnEntity.getNote())
-                .description(returnEntity.getDescription())
-                .createdAt(returnEntity.getCreatedAt() != null ? returnEntity.getCreatedAt().toString() : null)
-                .updatedAt(returnEntity.getUpdatedAt() != null ? returnEntity.getUpdatedAt().toString() : null)
+                .orderNo(returnEntity.getOrderNo())
                 .build();
     }
     

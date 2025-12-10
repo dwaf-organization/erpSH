@@ -13,4 +13,5 @@ public class OrderSearchDto {
     private String orderDtEnd;        // 주문일자 끝
     private String customerName;      // 거래처명 (부분일치)
     private String deliveryStatus;    // 배송상태 (배송요청, 배송중, 배송완료)
+    private Integer hqCode;           // 본사코드
 }

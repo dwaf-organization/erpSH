@@ -13,6 +13,7 @@ public class ReturnRespDto {
     
     // 반품 기본정보
     private String returnNo;             // 반품코드
+    private String orderNo;                 // 주문번호
     private Integer customerCode;           // 거래처코드
     private String customerName;            // 거래처명 (JOIN)
     private String returnRequestDate;       // 반품요청일
@@ -44,10 +45,6 @@ public class ReturnRespDto {
     private String returnMessage;           // 반품사유
     
     // 기타 반품테이블 항목들
-    private Integer hqCode;                 // 본사코드
     private String returnType;              // 반품유형
     private String processedBy;             // 처리자
-    private String description;             // 적요
-    private String createdAt;               // 생성일
-    private String updatedAt;               // 수정일
 }

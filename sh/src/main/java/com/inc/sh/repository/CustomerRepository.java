@@ -299,7 +299,64 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
         @Param("customerSearch") String customerSearch,
         @Param("brandCode") Integer brandCode
     );
-
+    
+    /**
+     * 거래처품목조회 팝업 - 복합 조인 쿼리 (기존 Repository에 추가)
+     * customer → warehouse → warehouse_items → item + item_customer_price (선택적)
+     */
+    @Query(value = "SELECT " +
+           "i.item_code, " +                    // 0
+           "i.item_name, " +                    // 1
+           "i.specification, " +                // 2
+           "i.purchase_unit, " +                // 3
+           "i.vat_type, " +                     // 4
+           "i.vat_detail, " +                   // 5
+           "i.origin, " +                       // 6
+           "i.category_code, " +                // 7
+           "ic.category_name, " +               // 8
+           "w.warehouse_code, " +               // 9
+           "w.warehouse_name, " +               // 10
+           "wi.current_quantity, " +            // 11
+           "wi.safe_quantity, " +               // 12
+           // 가격 정보 (거래처별 우선, 없으면 기본가격)
+           "COALESCE(icp.customer_supply_price, i.base_price) AS base_price, " +     // 13
+           "COALESCE(icp.supply_price, i.supply_price) AS supply_price, " +          // 14
+           "COALESCE(icp.tax_amount, i.tax_amount) AS tax_amount, " +                // 15
+           "COALESCE(icp.taxable_amount, i.taxable_amount) AS taxable_amount, " +    // 16
+           "COALESCE(icp.duty_free_amount, i.duty_free_amount) AS duty_free_amount, " + // 17
+           "COALESCE(icp.total_amount, i.total_amount) AS total_amount, " +          // 18
+           "i.order_available_yn, " +           // 19
+           "i.min_order_qty, " +               // 20
+           "i.max_order_qty, " +               // 21
+           "i.deadline_day, " +                 // 22
+           "i.deadline_time " +                 // 23
+           "FROM customer c " +
+           "INNER JOIN warehouse w ON c.dist_center_code = w.dist_center_code " +
+           "INNER JOIN warehouse_items wi ON w.warehouse_code = wi.warehouse_code " +
+           "INNER JOIN item i ON wi.item_code = i.item_code " +
+           "LEFT JOIN item_category ic ON i.category_code = ic.category_code " +
+           "LEFT JOIN item_customer_price icp ON (i.item_code = icp.item_code AND c.customer_code = icp.customer_code " +
+           "         AND (icp.end_dt IS NULL OR icp.end_dt >= CURDATE())) " +
+           "WHERE c.hq_code = :hqCode " +
+           "AND c.customer_code = :customerCode " +
+           "AND (:warehouseCode IS NULL OR w.warehouse_code = :warehouseCode) " +
+           "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
+           "AND (:priceType IS NULL OR i.price_type = :priceType) " +
+           "AND (:item IS NULL OR " +
+           "     CAST(i.item_code AS CHAR) LIKE CONCAT('%', :item, '%') OR " +
+           "     i.item_name LIKE CONCAT('%', :item, '%')) " +
+           "AND i.order_available_yn = 1 " +    // 주문가능 품목만
+           "AND w.use_yn = 1 " +                // 사용중 창고만
+           "ORDER BY i.item_code ASC", nativeQuery = true)
+    List<Object[]> findCustomerItemsWithPrice(
+        @Param("hqCode") Integer hqCode,
+        @Param("customerCode") Integer customerCode,
+        @Param("item") String item,
+        @Param("warehouseCode") Integer warehouseCode,
+        @Param("categoryCode") Integer categoryCode,
+        @Param("priceType") Integer priceType
+    );
+    
     /**
      * 브랜드별 후입금 거래처 조회 (미수잔액 관리용)
      */

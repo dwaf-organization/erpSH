@@ -146,6 +146,7 @@ public class OrderService {
             
             orderEntity = Order.builder()
                     .orderNo(orderNo)
+                    .hqCode(saveDto.getHqCode())
                     .customerCode(saveDto.getCustomerCode())
                     .vehicleCode(saveDto.getVehicleCode())
                     .distCenterCode(saveDto.getDistCenterCode())
@@ -468,23 +469,27 @@ public class OrderService {
     @Transactional(readOnly = true)
     public RespDto<List<OrderRespDto>> getOrderList(OrderSearchDto searchDto) {
         try {
-            log.info("주문 목록 조회 시작");
+            log.info("주문 목록 조회 시작 - orderDtStart: {}, orderDtEnd: {}, customerName: {}, deliveryStatus: {}, hqCode: {}",
+                    searchDto.getOrderDtStart(), searchDto.getOrderDtEnd(), 
+                    searchDto.getCustomerName(), searchDto.getDeliveryStatus(), searchDto.getHqCode());
             
-            List<Order> orders = orderRepository.findBySearchConditions(
+            List<Order> orders = orderRepository.findBySearchConditionsWithHqCode(
                     searchDto.getOrderDtStart(),
                     searchDto.getOrderDtEnd(),
                     searchDto.getCustomerName(),
-                    searchDto.getDeliveryStatus()
+                    searchDto.getDeliveryStatus(),
+                    searchDto.getHqCode()
             );
             
             List<OrderRespDto> responseList = orders.stream()
                     .map(OrderRespDto::fromEntity)
                     .collect(Collectors.toList());
             
+            log.info("주문 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("주문 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("주문 목록 조회 중 오류 발생", e);
+            log.error("주문 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("주문 목록 조회 중 오류가 발생했습니다.");
         }
     }

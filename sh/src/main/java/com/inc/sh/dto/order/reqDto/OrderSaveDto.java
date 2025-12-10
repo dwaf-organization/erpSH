@@ -10,6 +10,7 @@ import lombok.*;
 public class OrderSaveDto {
     
     private String orderNo;                     // 주문번호 (신규시 null)
+    private Integer hqCode;                     // 본사코드 (필수)
     private Integer customerCode;               // 거래처코드
     private String orderDt;                     // 주문일자 (yyyyMMdd)
     private String deliveryRequestDt;           // 납기요청일 (yyyyMMdd)

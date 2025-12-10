@@ -11,6 +11,7 @@ import lombok.*;
 public class OrderRespDto {
     
     private String orderNo;
+    private Integer hqCode;           // 본사코드
     private Integer customerCode;
     private String customerName;
     private String bizNum;
@@ -36,6 +37,7 @@ public class OrderRespDto {
     public static OrderRespDto fromEntity(Order order) {
         return OrderRespDto.builder()
                 .orderNo(order.getOrderNo())
+                .hqCode(order.getHqCode())
                 .customerCode(order.getCustomerCode())
                 .customerName(order.getCustomerName())
                 .bizNum(order.getBizNum())
