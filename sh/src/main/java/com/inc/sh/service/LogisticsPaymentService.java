@@ -25,12 +25,14 @@ public class LogisticsPaymentService {
     @Transactional(readOnly = true)
     public RespDto<List<LogisticsPaymentRespDto>> getLogisticsPaymentStatus(LogisticsPaymentSearchDto searchDto) {
         try {
-            log.info("물류대금마감현황 조회 시작 - 조건: {}", searchDto);
+            log.info("물류대금마감현황 조회 시작 - hqCode: {}, 주문번호: {}, 거래처코드: {}, 회수기일: {}", 
+                    searchDto.getHqCode(), searchDto.getOrderNo(), searchDto.getCustomerCode(), searchDto.getCollectionDate());
             
-            List<Object[]> results = orderRepository.findLogisticsPaymentStatus(
+            List<Object[]> results = orderRepository.findLogisticsPaymentStatusWithHqCode(
                     searchDto.getOrderNo(),
                     searchDto.getCustomerCode(),
-                    searchDto.getCollectionDate()
+                    searchDto.getCollectionDate(),
+                    searchDto.getHqCode()
             );
             
             List<LogisticsPaymentRespDto> paymentStatusList = results.stream()
@@ -49,11 +51,11 @@ public class LogisticsPaymentService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("물류대금마감현황 조회 완료 - 조회 건수: {}", paymentStatusList.size());
+            log.info("물류대금마감현황 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), paymentStatusList.size());
             return RespDto.success("물류대금마감현황 조회 성공", paymentStatusList);
             
         } catch (Exception e) {
-            log.error("물류대금마감현황 조회 중 오류 발생", e);
+            log.error("물류대금마감현황 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("물류대금마감현황 조회 중 오류가 발생했습니다.");
         }
     }

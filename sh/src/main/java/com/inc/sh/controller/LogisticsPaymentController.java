@@ -27,15 +27,17 @@ public class LogisticsPaymentController {
     public ResponseEntity<RespDto<List<LogisticsPaymentRespDto>>> getLogisticsPaymentStatus(
             @RequestParam(value = "orderNo", required = false) String orderNo,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
-            @RequestParam(value = "collectionDate", required = false) String collectionDate) {
+            @RequestParam(value = "collectionDate", required = false) String collectionDate,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("물류대금마감현황 조회 요청 - 주문번호: {}, 거래처코드: {}, 회수기일: {}", 
-                orderNo, customerCode, collectionDate);
+        log.info("물류대금마감현황 조회 요청 - 주문번호: {}, 거래처코드: {}, 회수기일: {}, hqCode: {}", 
+                orderNo, customerCode, collectionDate, hqCode);
         
         LogisticsPaymentSearchDto searchDto = LogisticsPaymentSearchDto.builder()
                 .orderNo(orderNo)
                 .customerCode(customerCode)
                 .collectionDate(collectionDate)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<LogisticsPaymentRespDto>> response = logisticsPaymentService.getLogisticsPaymentStatus(searchDto);

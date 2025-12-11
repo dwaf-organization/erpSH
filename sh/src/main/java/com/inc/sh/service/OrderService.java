@@ -67,23 +67,26 @@ public class OrderService {
     }
 
     /**
-     * 주문품목 목록 조회
+     * 주문품목 목록 조회 (기본가격 정보 포함)
      */
     @Transactional(readOnly = true)
     public RespDto<List<OrderItemRespDto>> getOrderItemList(String orderNo) {
         try {
             log.info("주문품목 목록 조회 시작 - orderNo: {}", orderNo);
             
-            List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderNo);
+            // 기본가격 정보 포함한 조회 (item_customer_price 조인)
+            List<Object[]> results = orderItemRepository.findByOrderNoWithBasicPrice(orderNo);
             
-            List<OrderItemRespDto> responseList = orderItems.stream()
-                    .map(OrderItemRespDto::fromEntity)
+            // Object[] → OrderItemRespDto 변환
+            List<OrderItemRespDto> responseList = results.stream()
+                    .map(OrderItemRespDto::fromObjectArrayWithBasicPrice)
                     .collect(Collectors.toList());
             
+            log.info("주문품목 목록 조회 완료 - orderNo: {}, 품목수: {}", orderNo, responseList.size());
             return RespDto.success("주문품목 목록 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("주문품목 목록 조회 중 오류 발생", e);
+            log.error("주문품목 목록 조회 중 오류 발생 - orderNo: {}", orderNo, e);
             return RespDto.fail("주문품목 목록 조회 중 오류가 발생했습니다.");
         }
     }

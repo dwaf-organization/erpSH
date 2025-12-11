@@ -13,8 +13,8 @@ public class CustomerItemRespDto {
     private Integer itemCode;
     private String itemName;
     private String specification;
-    private String purchaseUnit;
-    private String vatType;
+    private String unit;
+    private String taxTarget;
     private String vatDetail;
     private String origin;
     private Integer categoryCode;
@@ -23,16 +23,16 @@ public class CustomerItemRespDto {
     // 창고 재고 정보
     private Integer warehouseCode;
     private String warehouseName;
-    private Integer currentQuantity;        // 현재고량
+    private Integer currentStockQty;        // 현재고량
     private Integer safeQuantity;           // 안전재고
     
     // 가격 정보 (거래처별 or 기본가격)
-    private Integer basePrice;              // 기준단가
-    private Integer supplyPrice;            // 공급가액
-    private Integer taxAmount;              // 부가세액
-    private Integer taxableAmount;          // 과세액
-    private Integer dutyFreeAmount;         // 면세액
-    private Integer totalAmount;            // 총액
+    private Integer orderUnitPrice;              // 기준단가
+    private Integer supplyAmt;            // 공급가액
+    private Integer vatAmt;              // 부가세액
+    private Integer taxableAmt;          // 과세액
+    private Integer taxFreeAmt;         // 면세액
+    private Integer totalAmt;            // 총액
     
     // 주문 관련 정보
     private Integer orderAvailableYn;       // 주문가능여부

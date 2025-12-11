@@ -49,6 +49,47 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Integer> {
     Object[] findOrderSummaryByOrderNo(@Param("orderNo") String orderNo);
     
     /**
+     * 주문번호별 품목 조회 (기본가격 정보 포함)
+     * order → customer → item_customer_price 조인
+     */
+    @Query(value = "SELECT " +
+           "oi.order_item_code, " +           // 0
+           "oi.order_no, " +                  // 1
+           "oi.item_code, " +                 // 2
+           "oi.release_warehouse_code, " +    // 3
+           "oi.item_name, " +                 // 4
+           "oi.specification, " +             // 5
+           "oi.unit, " +                      // 6
+           "oi.price_type, " +                // 7
+           "oi.order_unit_price, " +          // 8
+           "oi.current_stock_qty, " +         // 9
+           "oi.order_qty, " +                 // 10
+           "oi.tax_target, " +                // 11
+           "oi.warehouse_name, " +            // 12
+           "oi.taxable_amt, " +               // 13 - 수량 곱해진 값
+           "oi.tax_free_amt, " +              // 14 - 수량 곱해진 값
+           "oi.supply_amt, " +                // 15 - 수량 곱해진 값
+           "oi.vat_amt, " +                   // 16 - 수량 곱해진 값
+           "oi.total_amt, " +                 // 17 - 수량 곱해진 값
+           "oi.total_qty, " +                 // 18
+           "oi.description, " +               // 19
+           // 기본가격 정보 (거래처별 우선, 없으면 기본가격)
+           "COALESCE(icp.supply_price, i.supply_price) AS supply_amt_basic, " +           // 20
+           "COALESCE(icp.taxable_amount, i.taxable_amount) AS taxable_amt_basic, " +      // 21
+           "COALESCE(icp.duty_free_amount, i.duty_free_amount) AS tax_free_amt_basic, " + // 22
+           "COALESCE(icp.tax_amount, i.tax_amount) AS vat_amt_basic, " +                  // 23
+           "COALESCE(icp.total_amount, i.total_amount) AS total_amt_basic " +             // 24
+           "FROM order_item oi " +
+           "LEFT JOIN `order` o ON oi.order_no = o.order_no " +
+           "LEFT JOIN item i ON oi.item_code = i.item_code " +
+           "LEFT JOIN item_customer_price icp ON (i.item_code = icp.item_code " +
+           "         AND o.customer_code = icp.customer_code " +
+           "         AND (icp.end_dt IS NULL OR icp.end_dt >= CURDATE())) " +
+           "WHERE oi.order_no = :orderNo " +
+           "ORDER BY oi.order_item_code", nativeQuery = true)
+    List<Object[]> findByOrderNoWithBasicPrice(@Param("orderNo") String orderNo);
+    
+    /**
      * 반품등록용 - 주문품목 조회 (거래처명, 창고명 JOIN)
      */
     @Query(value = "SELECT " +

@@ -59,7 +59,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
            "(:customerName IS NULL OR o.customer_name LIKE CONCAT('%', :customerName, '%')) AND " +
            "(:deliveryStatus IS NULL OR o.delivery_status = :deliveryStatus) " +
            "ORDER BY o.order_dt DESC, o.order_no DESC", nativeQuery = true)
-    List<Order> findBySearchConditions(
+    List<Object[]> findBySearchConditions(
         @Param("orderDtStart") String orderDtStart,
         @Param("orderDtEnd") String orderDtEnd,
         @Param("customerName") String customerName,
@@ -848,4 +848,34 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             @Param("customerCode") Integer customerCode,
             @Param("oneMonthAgo") String oneMonthAgo,
             @Param("today") String today);
+
+    /**
+     * 물류대금마감현황 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "o.order_no, " +                                    // 0
+           "o.customer_code, " +                               // 1
+           "c.customer_name, " +                               // 2
+           "o.order_dt, " +                                    // 3
+           "c.collection_day, " +                              // 4
+           "o.payment_at, " +                                  // 5 (납부일자)
+           "o.supply_amt, " +                                  // 6
+           "o.vat_amt, " +                                     // 7
+           "o.total_amt, " +                                   // 8
+           "o.payment_status, " +                              // 9
+           "DATE_FORMAT(DATE_ADD(STR_TO_DATE(o.order_dt, '%Y%m%d'), INTERVAL c.collection_day DAY), '%Y%m%d') as collection_due_date " + // 10 (계산된 회수기일)
+           "FROM `order` o " +
+           "LEFT JOIN customer c ON o.customer_code = c.customer_code " +
+           "WHERE (:orderNo IS NULL OR o.order_no LIKE CONCAT('%', :orderNo, '%')) " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND (:collectionDate IS NULL OR DATE_FORMAT(DATE_ADD(STR_TO_DATE(o.order_dt, '%Y%m%d'), INTERVAL c.collection_day DAY), '%Y%m%d') = :collectionDate) " +
+           "AND o.hq_code = :hqCode " +
+           "ORDER BY o.order_no, DATE_FORMAT(DATE_ADD(STR_TO_DATE(o.order_dt, '%Y%m%d'), INTERVAL c.collection_day DAY), '%Y%m%d'), o.customer_code", 
+           nativeQuery = true)
+    List<Object[]> findLogisticsPaymentStatusWithHqCode(
+        @Param("orderNo") String orderNo,
+        @Param("customerCode") Integer customerCode,
+        @Param("collectionDate") String collectionDate,
+        @Param("hqCode") Integer hqCode
+    );
 }
