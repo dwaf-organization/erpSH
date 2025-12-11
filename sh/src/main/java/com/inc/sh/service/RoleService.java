@@ -2,9 +2,12 @@ package com.inc.sh.service;
 
 import com.inc.sh.dto.role.reqDto.RoleSearchDto;
 import com.inc.sh.dto.role.reqDto.RoleSaveDto;
+import com.inc.sh.dto.role.reqDto.RoleSaveReqDto;
+import com.inc.sh.dto.role.reqDto.RoleDeleteReqDto;
 import com.inc.sh.dto.role.reqDto.RoleMenuSaveDto;
 import com.inc.sh.dto.role.respDto.RoleRespDto;
 import com.inc.sh.dto.role.respDto.MenuTreeRespDto;
+import com.inc.sh.dto.role.respDto.RoleBatchResult;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.entity.*;
 import com.inc.sh.repository.*;
@@ -27,14 +30,22 @@ public class RoleService {
     private final UserRepository userRepository;
     
     /**
-     * 권한 조회
+     * 권한 조회 (hqCode 검증 추가)
      */
     @Transactional(readOnly = true)
     public RespDto<List<RoleRespDto>> getRoleList(RoleSearchDto searchDto) {
         try {
-            log.info("권한 조회 시작 - 조건: {}", searchDto);
+            log.info("권한 조회 시작 - hqCode: {}, roleCode: {}, roleName: {}", 
+                    searchDto.getHqCode(), searchDto.getRoleCode(), searchDto.getRoleName());
             
-            List<Object[]> results = roleRepository.findRolesByConditions(
+            // hqCode 필수 검증
+            if (searchDto.getHqCode() == null) {
+                return RespDto.fail("본사코드는 필수 파라미터입니다.");
+            }
+            
+            // hqCode 포함 조회
+            List<Object[]> results = roleRepository.findRolesByConditionsAndHqCode(
+                    searchDto.getHqCode(),
                     searchDto.getRoleCode(),
                     searchDto.getRoleName()
             );
@@ -48,7 +59,7 @@ public class RoleService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("권한 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("권한 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("권한 조회 성공", responseList);
             
         } catch (Exception e) {
@@ -58,88 +69,210 @@ public class RoleService {
     }
     
     /**
-     * 권한 저장 (신규/수정)
+     * 권한 다중 저장 (신규/수정)
      */
     @Transactional
-    public RespDto<String> saveRole(RoleSaveDto saveDto) {
+    public RespDto<RoleBatchResult> saveRoles(RoleSaveReqDto request) {
         try {
-            log.info("권한 저장 시작 - 권한코드: {}, 권한이름: {}", saveDto.getRoleCode(), saveDto.getRoleName());
+            log.info("권한 다중 저장 시작 - 총 {}건", 
+                    request.getRoles() != null ? request.getRoles().size() : 0);
             
-            boolean isUpdate = saveDto.getRoleCode() != null;
-            Role role;
-            
-            if (isUpdate) {
-                // 수정
-                role = roleRepository.findByRoleCode(saveDto.getRoleCode());
-                if (role == null) {
-                    return RespDto.fail("해당 권한을 찾을 수 없습니다.");
-                }
-                
-                role.setRoleName(saveDto.getRoleName());
-                role.setNote(saveDto.getNote());
-                role.setHqCode(saveDto.getHqCode());
-                role.setDescription("권한수정");
-                
-            } else {
-                // 신규
-                role = Role.builder()
-                        .hqCode(saveDto.getHqCode())
-                        .roleName(saveDto.getRoleName())
-                        .note(saveDto.getNote())
-                        .description("권한등록")
-                        .build();
+            // 요청 데이터 검증
+            if (request.getRoles() == null || request.getRoles().isEmpty()) {
+                return RespDto.fail("저장할 권한 데이터가 없습니다.");
             }
             
-            role = roleRepository.save(role);
+            List<RoleBatchResult.RoleSuccessResult> successList = new ArrayList<>();
+            List<RoleBatchResult.RoleFailureResult> failureList = new ArrayList<>();
             
-            String action = isUpdate ? "수정" : "등록";
-            log.info("권한 {} 완료 - 권한코드: {}", action, role.getRoleCode());
-            return RespDto.success("권한이 " + action + "되었습니다.", role.getRoleCode().toString());
+            // 개별 저장 처리
+            for (RoleSaveReqDto.RoleSaveItemDto saveDto : request.getRoles()) {
+                try {
+                    // 필수 필드 검증
+                    if (saveDto.getRoleName() == null || saveDto.getRoleName().trim().isEmpty()) {
+                        throw new RuntimeException("권한이름은 필수입니다.");
+                    }
+                    if (saveDto.getHqCode() == null) {
+                        throw new RuntimeException("본사코드는 필수입니다.");
+                    }
+                    
+                    RoleBatchResult.RoleSuccessResult result = saveSingleRole(saveDto);
+                    if (result != null) {
+                        successList.add(result);
+                        log.info("권한 저장 성공 - 권한코드: {}, 권한이름: {}", 
+                                result.getRoleCode(), result.getRoleName());
+                    }
+                } catch (Exception e) {
+                    RoleBatchResult.RoleFailureResult failure = 
+                        RoleBatchResult.RoleFailureResult.builder()
+                                .roleCode(saveDto.getRoleCode())
+                                .roleName(saveDto.getRoleName())
+                                .reason(e.getMessage())
+                                .build();
+                    failureList.add(failure);
+                    log.error("권한 저장 실패 - 권한이름: {}, 원인: {}", saveDto.getRoleName(), e.getMessage());
+                }
+            }
+            
+            // 결과 집계
+            RoleBatchResult batchResult = RoleBatchResult.builder()
+                    .totalCount(request.getRoles().size())
+                    .successCount(successList.size())
+                    .failureCount(failureList.size())
+                    .successList(successList)
+                    .failureList(failureList)
+                    .build();
+            
+            log.info("권한 다중 저장 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailureCount());
+            
+            String resultMessage = String.format("권한 다중 저장 완료 (성공: %d건, 실패: %d건)", 
+                    batchResult.getSuccessCount(), batchResult.getFailureCount());
+            
+            return RespDto.success(resultMessage, batchResult);
             
         } catch (Exception e) {
-            log.error("권한 저장 중 오류 발생", e);
-            return RespDto.fail("권한 저장 중 오류가 발생했습니다: " + e.getMessage());
+            log.error("권한 다중 저장 중 오류 발생", e);
+            return RespDto.fail("권한 다중 저장 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
     
     /**
-     * 권한 삭제
+     * 권한 다중 삭제
      */
     @Transactional
-    public RespDto<String> deleteRole(Integer roleCode) {
+    public RespDto<RoleBatchResult> deleteRoles(RoleDeleteReqDto request) {
         try {
-            log.info("권한 삭제 시작 - 권한코드: {}", roleCode);
+            log.info("권한 다중 삭제 시작 - 총 {}건", 
+                    request.getRoleCodes() != null ? request.getRoleCodes().size() : 0);
             
-            Role role = roleRepository.findByRoleCode(roleCode);
-            if (role == null) {
-                return RespDto.fail("해당 권한을 찾을 수 없습니다.");
+            // 요청 데이터 검증
+            if (request.getRoleCodes() == null || request.getRoleCodes().isEmpty()) {
+                return RespDto.fail("삭제할 권한코드가 없습니다.");
             }
             
-            // 해당 권한을 사용하는 사용자 조회
-            List<User> usersWithRole = userRepository.findAll().stream()
-                    .filter(user -> roleCode.equals(user.getRoleCode()))
-                    .collect(Collectors.toList());
+            List<RoleBatchResult.RoleSuccessResult> successList = new ArrayList<>();
+            List<RoleBatchResult.RoleFailureResult> failureList = new ArrayList<>();
             
-            if (!usersWithRole.isEmpty()) {
-                String userCodes = usersWithRole.stream()
-                        .map(User::getUserCode)
-                        .collect(Collectors.joining(", "));
-                return RespDto.fail("사용중인 권한입니다. 사용자: " + userCodes);
+            // 개별 삭제 처리
+            for (Integer roleCode : request.getRoleCodes()) {
+                try {
+                    RoleBatchResult.RoleSuccessResult result = deleteSingleRole(roleCode);
+                    if (result != null) {
+                        successList.add(result);
+                        log.info("권한 삭제 성공 - 권한코드: {}", roleCode);
+                    }
+                } catch (Exception e) {
+                    RoleBatchResult.RoleFailureResult failure = 
+                        RoleBatchResult.RoleFailureResult.builder()
+                                .roleCode(roleCode)
+                                .reason(e.getMessage())
+                                .build();
+                    failureList.add(failure);
+                    log.error("권한 삭제 실패 - 권한코드: {}, 원인: {}", roleCode, e.getMessage());
+                }
             }
             
-            // 권한 메뉴 권한 먼저 삭제
-            roleMenuPermissionsRepository.deleteByRoleCode(roleCode);
+            // 결과 집계
+            RoleBatchResult batchResult = RoleBatchResult.builder()
+                    .totalCount(request.getRoleCodes().size())
+                    .successCount(successList.size())
+                    .failureCount(failureList.size())
+                    .successList(successList)
+                    .failureList(failureList)
+                    .build();
             
-            // 권한 삭제
-            roleRepository.delete(role);
+            log.info("권한 다중 삭제 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailureCount());
             
-            log.info("권한 삭제 완료 - 권한코드: {}", roleCode);
-            return RespDto.success("권한이 삭제되었습니다.", "삭제 완료");
+            String resultMessage = String.format("권한 다중 삭제 완료 (성공: %d건, 실패: %d건)", 
+                    batchResult.getSuccessCount(), batchResult.getFailureCount());
+            
+            return RespDto.success(resultMessage, batchResult);
             
         } catch (Exception e) {
-            log.error("권한 삭제 중 오류 발생", e);
-            return RespDto.fail("권한 삭제 중 오류가 발생했습니다: " + e.getMessage());
+            log.error("권한 다중 삭제 중 오류 발생", e);
+            return RespDto.fail("권한 다중 삭제 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 개별 권한 저장 처리
+     */
+    private RoleBatchResult.RoleSuccessResult saveSingleRole(RoleSaveReqDto.RoleSaveItemDto saveDto) {
+        boolean isUpdate = saveDto.getRoleCode() != null;
+        Role role;
+        
+        if (isUpdate) {
+            // 수정
+            role = roleRepository.findByRoleCode(saveDto.getRoleCode());
+            if (role == null) {
+                throw new RuntimeException("해당 권한을 찾을 수 없습니다.");
+            }
+            
+            // 권한명 중복 체크 (동일 본사 내에서, 본인 제외)
+            Role existingRole = roleRepository.findByHqCodeAndRoleName(saveDto.getHqCode(), saveDto.getRoleName());
+            if (existingRole != null && !existingRole.getRoleCode().equals(saveDto.getRoleCode())) {
+                throw new RuntimeException("해당 본사에 이미 존재하는 권한이름입니다.");
+            }
+            
+            role.setRoleName(saveDto.getRoleName());
+            role.setNote(saveDto.getNote());
+            role.setHqCode(saveDto.getHqCode());
+            role.setDescription("권한수정");
+            
+        } else {
+            // 신규 - 권한명 중복 체크 (동일 본사 내에서)
+            if (roleRepository.existsByHqCodeAndRoleName(saveDto.getHqCode(), saveDto.getRoleName())) {
+                throw new RuntimeException("해당 본사에 이미 존재하는 권한이름입니다.");
+            }
+            
+            role = Role.builder()
+                    .roleName(saveDto.getRoleName())
+                    .note(saveDto.getNote())
+                    .hqCode(saveDto.getHqCode())
+                    .description("권한등록")
+                    .build();
+        }
+        
+        role = roleRepository.save(role);
+        
+        String action = isUpdate ? "수정" : "등록";
+        return RoleBatchResult.RoleSuccessResult.builder()
+                .roleCode(role.getRoleCode())
+                .roleName(role.getRoleName())
+                .note(role.getNote())
+                .hqCode(role.getHqCode())
+                .message(String.format("%s 완료", action))
+                .build();
+    }
+    
+    /**
+     * 개별 권한 삭제 처리
+     */
+    private RoleBatchResult.RoleSuccessResult deleteSingleRole(Integer roleCode) {
+        Role role = roleRepository.findByRoleCode(roleCode);
+        if (role == null) {
+            throw new RuntimeException("해당 권한을 찾을 수 없습니다.");
+        }
+        
+        String roleName = role.getRoleName();
+        String note = role.getNote();
+        Integer hqCode = role.getHqCode();
+        
+        // 권한 메뉴 연결 데이터 먼저 삭제
+        roleMenuPermissionsRepository.deleteByRoleCode(roleCode);
+        
+        // 권한 삭제
+        roleRepository.delete(role);
+        
+        return RoleBatchResult.RoleSuccessResult.builder()
+                .roleCode(roleCode)
+                .roleName(roleName)
+                .note(note)
+                .hqCode(hqCode)
+                .message("삭제 완료")
+                .build();
     }
     
     /**

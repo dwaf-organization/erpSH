@@ -372,6 +372,25 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "AND c.deposit_type_code = 0 " +
            "ORDER BY c.customer_code", nativeQuery = true)
     List<Object[]> findCustomerBalanceByBrandCode(@Param("brandCode") Integer brandCode);
+
+    /**
+     * 브랜드별 후입금 거래처 미수잔액 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "c.customer_code, " +
+           "c.customer_name, " +
+           "c.owner_name, " +
+           "c.credit_limit, " +
+           "c.balance_amt " +
+           "FROM customer c " +
+           "WHERE (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+//           "AND c.deposit_type_code = 0 " +
+           "AND c.hq_code = :hqCode " +
+           "ORDER BY c.customer_code", nativeQuery = true)
+    List<Object[]> findCustomerBalanceByBrandCodeWithHqCode(
+        @Param("brandCode") Integer brandCode,
+        @Param("hqCode") Integer hqCode
+    );
     
 
     /**

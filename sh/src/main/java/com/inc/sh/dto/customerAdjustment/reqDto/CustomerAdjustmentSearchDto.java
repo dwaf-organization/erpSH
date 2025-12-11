@@ -9,6 +9,8 @@ import lombok.*;
 @Builder
 public class CustomerAdjustmentSearchDto {
     
-    private Integer customerCode;       // 거래처코드 (완전일치)
-    private String adjustmentDate;      // 조정일자 (YYYYMMDD)
+    private Integer hqCode;                 // 본사코드 (완전일치, 필수)
+    private Integer customerCode;           // 거래처코드 (완전일치)
+    private String adjustmentDateStart;     // 조정일자 시작 (YYYYMMDD)
+    private String adjustmentDateEnd;       // 조정일자 종료 (YYYYMMDD)
 }

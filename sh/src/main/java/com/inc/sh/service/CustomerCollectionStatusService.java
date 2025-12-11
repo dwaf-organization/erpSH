@@ -26,13 +26,15 @@ public class CustomerCollectionStatusService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerCollectionStatusRespDto>> getCustomerCollectionStatusList(CustomerCollectionStatusSearchDto searchDto) {
         try {
-            log.info("거래처별잔액현황 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처별잔액현황 조회 시작 - hqCode: {}, 기간: {}~{}, 거래처: {}", 
+                    searchDto.getHqCode(), searchDto.getStartDate(), searchDto.getEndDate(), searchDto.getCustomerCode());
             
             // 1. 기간 내 거래가 있는 거래처들의 집계 데이터 조회
-            List<Object[]> transactionSummaries = customerAccountTransactionsRepository.findAllCustomerTransactionSummary(
+            List<Object[]> transactionSummaries = customerAccountTransactionsRepository.findAllCustomerTransactionSummaryWithHqCode(
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
-                    searchDto.getCustomerCode()
+                    searchDto.getCustomerCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerCollectionStatusRespDto> responseList = new ArrayList<>();
@@ -81,11 +83,11 @@ public class CustomerCollectionStatusService {
                         customerCode, previousBalance, salesAmount, depositAmount, adjustmentAmount, currentBalance);
             }
             
-            log.info("거래처별잔액현황 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("거래처별잔액현황 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("거래처별잔액현황 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("거래처별잔액현황 조회 중 오류 발생", e);
+            log.error("거래처별잔액현황 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처별잔액현황 조회 중 오류가 발생했습니다.");
         }
     }

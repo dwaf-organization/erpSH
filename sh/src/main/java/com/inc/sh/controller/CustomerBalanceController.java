@@ -22,16 +22,17 @@ public class CustomerBalanceController {
     private final CustomerBalanceService customerBalanceService;
 
     /**
-     * 브랜드별 후입금 거래처 미수잔액 조회
+     * 브랜드별 후입금 거래처 잔액 조회
      * GET /api/v1/erp/customer-balance/list
      */
     @GetMapping("/list")
     public ResponseEntity<RespDto<List<CustomerBalanceRespDto>>> getCustomerBalanceList(
-            @RequestParam("brandCode") Integer brandCode) {
+            @RequestParam(value = "brandCode", required = false) Integer brandCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처미수잔액 조회 요청 - 브랜드코드: {}", brandCode);
+        log.info("거래처미수잔액 조회 요청 - 브랜드코드: {}, hqCode: {}", brandCode, hqCode);
         
-        RespDto<List<CustomerBalanceRespDto>> response = customerBalanceService.getCustomerBalanceList(brandCode);
+        RespDto<List<CustomerBalanceRespDto>> response = customerBalanceService.getCustomerBalanceList(brandCode, hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);

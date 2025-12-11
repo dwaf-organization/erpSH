@@ -38,13 +38,16 @@ public class WarehouseTransferService {
     @Transactional(readOnly = true)
     public RespDto<List<WarehouseTransferListRespDto>> getWarehouseTransferList(WarehouseTransferListSearchDto searchDto) {
         try {
-            log.info("창고이송현황 목록 조회 시작 - 조건: {}", searchDto);
+            log.info("창고이송현황 목록 조회 시작 - hqCode: {}, 기간: {}~{}, 출고창고: {}, 입고창고: {}", 
+                    searchDto.getHqCode(), searchDto.getStartYm(), searchDto.getEndYm(), 
+                    searchDto.getFromWarehouseCode(), searchDto.getToWarehouseCode());
             
-            List<Object[]> results = warehouseTransfersRepository.findWarehouseTransferList(
+            List<Object[]> results = warehouseTransfersRepository.findWarehouseTransferListWithHqCode(
                     searchDto.getStartYm(),
                     searchDto.getEndYm(),
                     searchDto.getFromWarehouseCode(),
-                    searchDto.getToWarehouseCode()
+                    searchDto.getToWarehouseCode(),
+                    searchDto.getHqCode()
             );
             
             List<WarehouseTransferListRespDto> responseList = results.stream()
@@ -59,11 +62,11 @@ public class WarehouseTransferService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("창고이송현황 목록 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("창고이송현황 목록 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("창고이송현황 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("창고이송현황 목록 조회 중 오류 발생", e);
+            log.error("창고이송현황 목록 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("창고이송현황 조회 중 오류가 발생했습니다.");
         }
     }
@@ -119,11 +122,11 @@ public class WarehouseTransferService {
      * 출고창고 품목 조회
      */
     @Transactional(readOnly = true)
-    public RespDto<List<WarehouseItemRespDto>> getWarehouseItems(Integer warehouseCode) {
+    public RespDto<List<WarehouseItemRespDto>> getWarehouseItems(Integer warehouseCode, Integer hqCode) {
         try {
-            log.info("출고창고 품목 조회 시작 - 창고코드: {}", warehouseCode);
+            log.info("출고창고 품목 조회 시작 - 창고코드: {}, hqCode: {}", warehouseCode, hqCode);
             
-            List<Object[]> results = warehouseItemsRepository.findWarehouseItemsForTransfer(warehouseCode);
+            List<Object[]> results = warehouseItemsRepository.findWarehouseItemsForTransferWithHqCode(warehouseCode, hqCode);
             
             List<WarehouseItemRespDto> responseList = results.stream()
                     .map(result -> WarehouseItemRespDto.builder()
@@ -136,11 +139,11 @@ public class WarehouseTransferService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("출고창고 품목 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("출고창고 품목 조회 완료 - hqCode: {}, 조회 건수: {}", hqCode, responseList.size());
             return RespDto.success("출고창고 품목 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("출고창고 품목 조회 중 오류 발생", e);
+            log.error("출고창고 품목 조회 중 오류 발생 - hqCode: {}", hqCode, e);
             return RespDto.fail("출고창고 품목 조회 중 오류가 발생했습니다.");
         }
     }

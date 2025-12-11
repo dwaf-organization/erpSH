@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -208,5 +209,43 @@ public class OrderController {
         } else {
             return ResponseEntity.badRequest().body(response);
         }
+    }
+    
+    /**
+     * 주문 다중 결제완료 처리
+     * PUT /api/v1/erp/order/payment-complete
+     */
+    @PutMapping("/payment-complete")
+    public ResponseEntity<RespDto<OrderPaymentBatchResult>> completePayments(@RequestBody OrderPaymentCompleteReqDto request) {
+        
+        log.info("주문 다중 결제완료 처리 요청 - 총 {}건", 
+                request.getOrderNos() != null ? request.getOrderNos().size() : 0);
+        
+        // 요청 데이터 검증
+        if (request.getOrderNos() == null || request.getOrderNos().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("결제완료 처리할 주문번호가 없습니다."));
+        }
+        
+        // 중복 제거 및 null/빈값 제거
+        List<String> validOrderNos = request.getOrderNos().stream()
+                .filter(Objects::nonNull)
+                .filter(orderNo -> !orderNo.trim().isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (validOrderNos.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("유효한 주문번호가 없습니다."));
+        }
+        
+        if (validOrderNos.size() != request.getOrderNos().size()) {
+            log.info("중복/null 주문번호 제거됨 - 원본: {}건, 제거 후: {}건", 
+                    request.getOrderNos().size(), validOrderNos.size());
+            request.setOrderNos(validOrderNos);
+        }
+        
+        RespDto<OrderPaymentBatchResult> response = orderService.completePayments(request);
+        return ResponseEntity.ok(response);
     }
 }

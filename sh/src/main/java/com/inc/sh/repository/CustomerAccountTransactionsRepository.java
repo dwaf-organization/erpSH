@@ -61,7 +61,7 @@ public interface CustomerAccountTransactionsRepository extends JpaRepository<Cus
     void deleteByReferenceIdAndReferenceType(@Param("referenceId") String referenceId, @Param("referenceType") String referenceType);
 
     /**
-     * 거래처조정처리 조회 (거래처명 포함)
+     * 거래처조정처리 조회 (거래처명 포함, hqCode 조건 추가, 날짜 범위 검색)
      */
     @Query(value = "SELECT " +
            "cat.transaction_code, " +
@@ -73,12 +73,16 @@ public interface CustomerAccountTransactionsRepository extends JpaRepository<Cus
            "FROM customer_account_transactions cat " +
            "JOIN customer c ON cat.customer_code = c.customer_code " +
            "WHERE cat.transaction_type = '조정' " +
+           "AND c.hq_code = :hqCode " +
            "AND (:customerCode IS NULL OR cat.customer_code = :customerCode) " +
-           "AND (:adjustmentDate IS NULL OR cat.transaction_date = :adjustmentDate) " +
+           "AND (:adjustmentDateStart IS NULL OR cat.transaction_date >= :adjustmentDateStart) " +
+           "AND (:adjustmentDateEnd IS NULL OR cat.transaction_date <= :adjustmentDateEnd) " +
            "ORDER BY cat.transaction_date DESC, cat.transaction_code DESC", nativeQuery = true)
-    List<Object[]> findCustomerAdjustmentsWithConditions(
+    List<Object[]> findCustomerAdjustmentsWithDateRange(
+        @Param("hqCode") Integer hqCode,
         @Param("customerCode") Integer customerCode,
-        @Param("adjustmentDate") String adjustmentDate
+        @Param("adjustmentDateStart") String adjustmentDateStart,
+        @Param("adjustmentDateEnd") String adjustmentDateEnd
     );
 
     /**
@@ -137,5 +141,31 @@ public interface CustomerAccountTransactionsRepository extends JpaRepository<Cus
         @Param("startDate") String startDate,
         @Param("endDate") String endDate,
         @Param("customerCode") Integer customerCode
+    );
+
+    /**
+     * 전체 거래처별 기간 내 거래 집계 조회 (본사별)
+     */
+    @Query(value = "SELECT " +
+           "cat.customer_code, " +
+           "c.customer_name, " +
+           "c.credit_limit, " +
+           "SUM(CASE WHEN cat.transaction_type IN ('출금', '외상') THEN ABS(cat.amount) ELSE 0 END) as sales_amount, " +
+           "SUM(CASE WHEN cat.transaction_type = '반품입금' THEN cat.amount ELSE 0 END) as return_amount, " +
+           "SUM(CASE WHEN cat.transaction_type = '입금' THEN cat.amount ELSE 0 END) as deposit_amount, " +
+           "SUM(CASE WHEN cat.transaction_type = '조정' THEN cat.amount ELSE 0 END) as adjustment_amount " +
+           "FROM customer_account_transactions cat " +
+           "JOIN customer c ON cat.customer_code = c.customer_code " +
+           "WHERE cat.transaction_date >= :startDate " +
+           "AND cat.transaction_date <= :endDate " +
+           "AND (:customerCode IS NULL OR cat.customer_code = :customerCode) " +
+           "AND c.hq_code = :hqCode " +
+           "GROUP BY cat.customer_code, c.customer_name, c.credit_limit " +
+           "ORDER BY cat.customer_code", nativeQuery = true)
+    List<Object[]> findAllCustomerTransactionSummaryWithHqCode(
+        @Param("startDate") String startDate,
+        @Param("endDate") String endDate,
+        @Param("customerCode") Integer customerCode,
+        @Param("hqCode") Integer hqCode
     );
 }

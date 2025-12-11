@@ -37,7 +37,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     String findLastUserCodeByPrefix(@Param("prefix") String prefix);
     
     /**
-     * 사용자 검색 조회 (권한명 포함)
+     * 사용자 검색 조회 (권한명 포함, hqCode 조건 추가)
      */
     @Query(value = "SELECT " +
            "u.user_code, " +
@@ -51,10 +51,12 @@ public interface UserRepository extends JpaRepository<User, String> {
            "u.user_pw " +
            "FROM user u " +
            "LEFT JOIN role r ON u.role_code = r.role_code " +
-           "WHERE (:userCode IS NULL OR u.user_code LIKE CONCAT('%', :userCode, '%')) " +
+           "WHERE u.hq_code = :hqCode " +
+           "AND (:userCode IS NULL OR u.user_code LIKE CONCAT('%', :userCode, '%')) " +
            "AND (:userName IS NULL OR u.user_name LIKE CONCAT('%', :userName, '%')) " +
            "ORDER BY u.user_code", nativeQuery = true)
-    List<Object[]> findUsersWithRoleByConditions(
+    List<Object[]> findUsersWithRoleByConditionsAndHqCode(
+        @Param("hqCode") Integer hqCode,
         @Param("userCode") String userCode,
         @Param("userName") String userName
     );

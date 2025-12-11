@@ -14,4 +14,5 @@ public class InventoryTransactionSearchDto {
     private Integer warehouseCode;      // 창고코드 (선택, 완전일치)
     private Integer categoryCode;       // 분류코드 (선택, 완전일치)
     private String itemCodeSearch;      // 품목코드 검색어 (선택, 품목코드만 부분검색)
+    private Integer hqCode;             // 본사코드
 }

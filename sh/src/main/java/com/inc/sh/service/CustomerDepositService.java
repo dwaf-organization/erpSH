@@ -35,13 +35,16 @@ public class CustomerDepositService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerDepositRespDto>> getCustomerDepositList(CustomerDepositSearchDto searchDto) {
         try {
-            log.info("거래처수금처리 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처수금처리 조회 시작 - hqCode: {}, 거래처: {}, 기간: {}~{}, 입금유형: {}", 
+                    searchDto.getHqCode(), searchDto.getCustomerCode(), searchDto.getStartDate(), 
+                    searchDto.getEndDate(), searchDto.getDepositTypeCode());
             
-            List<Object[]> results = depositsRepository.findCustomerDepositsWithConditions(
+            List<Object[]> results = depositsRepository.findCustomerDepositsWithConditionsWithHqCode(
                     searchDto.getCustomerCode(),
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
-                    searchDto.getDepositTypeCode()
+                    searchDto.getDepositTypeCode(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerDepositRespDto> responseList = results.stream()
@@ -57,11 +60,11 @@ public class CustomerDepositService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("거래처수금처리 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("거래처수금처리 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("거래처수금처리 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("거래처수금처리 조회 중 오류 발생", e);
+            log.error("거래처수금처리 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처수금처리 조회 중 오류가 발생했습니다.");
         }
     }

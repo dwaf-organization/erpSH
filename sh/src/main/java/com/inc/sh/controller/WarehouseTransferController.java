@@ -31,16 +31,18 @@ public class WarehouseTransferController {
             @RequestParam("startYm") String startYm,
             @RequestParam("endYm") String endYm,
             @RequestParam(value = "fromWarehouseCode", required = false) Integer fromWarehouseCode,
-            @RequestParam(value = "toWarehouseCode", required = false) Integer toWarehouseCode) {
+            @RequestParam(value = "toWarehouseCode", required = false) Integer toWarehouseCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("창고이송현황 목록 조회 요청 - 기간: {}~{}, 출고창고: {}, 입고창고: {}", 
-                startYm, endYm, fromWarehouseCode, toWarehouseCode);
+        log.info("창고이송현황 목록 조회 요청 - 기간: {}~{}, 출고창고: {}, 입고창고: {}, hqCode: {}", 
+                startYm, endYm, fromWarehouseCode, toWarehouseCode, hqCode);
         
         WarehouseTransferListSearchDto searchDto = WarehouseTransferListSearchDto.builder()
                 .startYm(startYm)
                 .endYm(endYm)
                 .fromWarehouseCode(fromWarehouseCode)
                 .toWarehouseCode(toWarehouseCode)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<WarehouseTransferListRespDto>> response = warehouseTransferService.getWarehouseTransferList(searchDto);
@@ -77,11 +79,12 @@ public class WarehouseTransferController {
      */
     @GetMapping("/warehouse-items")
     public ResponseEntity<RespDto<List<WarehouseItemRespDto>>> getWarehouseItems(
-            @RequestParam("warehouseCode") Integer warehouseCode) {
+            @RequestParam("warehouseCode") Integer warehouseCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("출고창고 품목 조회 요청 - 창고코드: {}", warehouseCode);
+        log.info("출고창고 품목 조회 요청 - 창고코드: {}, hqCode: {}", warehouseCode, hqCode);
         
-        RespDto<List<WarehouseItemRespDto>> response = warehouseTransferService.getWarehouseItems(warehouseCode);
+        RespDto<List<WarehouseItemRespDto>> response = warehouseTransferService.getWarehouseItems(warehouseCode, hqCode);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);

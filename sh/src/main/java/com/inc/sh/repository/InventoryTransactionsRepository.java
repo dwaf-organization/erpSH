@@ -71,6 +71,45 @@ public interface InventoryTransactionsRepository extends JpaRepository<Inventory
         @Param("categoryCode") Integer categoryCode,
         @Param("itemCodeSearch") String itemCodeSearch
     );
+
+    /**
+     * 재고수불부 조회 (분류명 계층구조 포함, 본사별)
+     */
+    @Query(value = "SELECT " +
+           "it.warehouse_code, " +
+           "CASE " +
+           "  WHEN ic1.parents_category_code = 0 THEN ic1.category_name " +
+           "  ELSE CONCAT(ic2.category_name, '-', ic1.category_name) " +
+           "END as category_display_name, " +
+           "it.item_code, " +
+           "i.item_name, " +
+           "i.specification, " +
+           "i.purchase_unit, " +
+           "it.transaction_date, " +
+           "it.transaction_type, " +
+           "it.quantity, " +
+           "it.unit_price, " +
+           "it.amount " +
+           "FROM inventory_transactions it " +
+           "JOIN item i ON it.item_code = i.item_code " +
+           "JOIN warehouse w ON it.warehouse_code = w.warehouse_code " +
+           "JOIN item_category ic1 ON i.category_code = ic1.category_code " +
+           "LEFT JOIN item_category ic2 ON ic1.parents_category_code = ic2.category_code " +
+           "WHERE it.transaction_date >= :startDate " +
+           "AND it.transaction_date <= :endDate " +
+           "AND (:warehouseCode IS NULL OR it.warehouse_code = :warehouseCode) " +
+           "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
+           "AND (:itemCodeSearch IS NULL OR it.item_code LIKE CONCAT('%', :itemCodeSearch, '%')) " +
+           "AND w.hq_code = :hqCode " +
+           "ORDER BY it.transaction_date, it.warehouse_code, it.item_code", nativeQuery = true)
+    List<Object[]> findInventoryTransactionSummaryWithHqCode(
+        @Param("startDate") String startDate,
+        @Param("endDate") String endDate,
+        @Param("warehouseCode") Integer warehouseCode,
+        @Param("categoryCode") Integer categoryCode,
+        @Param("itemCodeSearch") String itemCodeSearch,
+        @Param("hqCode") Integer hqCode
+    );
     
     /**
      * 창고품목코드 목록으로 재고수불부 삭제

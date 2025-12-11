@@ -820,4 +820,93 @@ public class OrderService {
 
         return String.format("%s%03d", today, sequence);
     }
+    
+    /**
+     * 주문 다중 결제완료 처리
+     */
+    @Transactional
+    public RespDto<OrderPaymentBatchResult> completePayments(OrderPaymentCompleteReqDto request) {
+        try {
+            log.info("주문 다중 결제완료 처리 시작 - 총 {}건", 
+                    request.getOrderNos() != null ? request.getOrderNos().size() : 0);
+            
+            // 요청 데이터 검증
+            if (request.getOrderNos() == null || request.getOrderNos().isEmpty()) {
+                return RespDto.fail("결제완료 처리할 주문번호가 없습니다.");
+            }
+            
+            List<OrderPaymentBatchResult.OrderPaymentSuccessResult> successList = new ArrayList<>();
+            List<OrderPaymentBatchResult.OrderPaymentFailureResult> failureList = new ArrayList<>();
+            
+            // 개별 결제완료 처리
+            for (String orderNo : request.getOrderNos()) {
+                try {
+                    OrderPaymentBatchResult.OrderPaymentSuccessResult result = completeSinglePayment(orderNo);
+                    if (result != null) {
+                        successList.add(result);
+                        log.info("주문 결제완료 성공 - 주문번호: {}", orderNo);
+                    }
+                } catch (Exception e) {
+                    OrderPaymentBatchResult.OrderPaymentFailureResult failure = 
+                        OrderPaymentBatchResult.OrderPaymentFailureResult.builder()
+                                .orderNo(orderNo)
+                                .reason(e.getMessage())
+                                .build();
+                    failureList.add(failure);
+                    log.error("주문 결제완료 실패 - 주문번호: {}, 원인: {}", orderNo, e.getMessage());
+                }
+            }
+            
+            // 결과 집계
+            OrderPaymentBatchResult batchResult = OrderPaymentBatchResult.builder()
+                    .totalCount(request.getOrderNos().size())
+                    .successCount(successList.size())
+                    .failureCount(failureList.size())
+                    .successList(successList)
+                    .failureList(failureList)
+                    .build();
+            
+            log.info("주문 다중 결제완료 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailureCount());
+            
+            String resultMessage = String.format("주문 다중 결제완료 처리 완료 (성공: %d건, 실패: %d건)", 
+                    batchResult.getSuccessCount(), batchResult.getFailureCount());
+            
+            return RespDto.success(resultMessage, batchResult);
+            
+        } catch (Exception e) {
+            log.error("주문 다중 결제완료 처리 중 오류 발생", e);
+            return RespDto.fail("주문 다중 결제완료 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 개별 주문 결제완료 처리
+     */
+    private OrderPaymentBatchResult.OrderPaymentSuccessResult completeSinglePayment(String orderNo) {
+        // 주문 조회
+        Order order = orderRepository.findByOrderNo(orderNo);
+        if (order == null) {
+            throw new RuntimeException("해당 주문을 찾을 수 없습니다.");
+        }
+        
+        // 현재 결제상태 확인
+        String previousStatus = order.getPaymentStatus();
+        if ("결제완료".equals(previousStatus)) {
+            throw new RuntimeException("이미 결제완료 처리된 주문입니다.");
+        }
+        
+        // 결제상태 변경
+        order.setPaymentStatus("결제완료");
+        orderRepository.save(order);
+        
+        return OrderPaymentBatchResult.OrderPaymentSuccessResult.builder()
+                .orderNo(orderNo)
+                .customerName(order.getCustomerName())
+                .totalAmt(order.getTotalAmt())
+                .previousStatus(previousStatus)
+                .currentStatus("결제완료")
+                .message(String.format("결제완료 처리됨 (총금액: %,d원)", order.getTotalAmt()))
+                .build();
+    }
 }

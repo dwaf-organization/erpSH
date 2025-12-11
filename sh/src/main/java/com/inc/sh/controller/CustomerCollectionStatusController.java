@@ -27,14 +27,16 @@ public class CustomerCollectionStatusController {
     public ResponseEntity<RespDto<List<CustomerCollectionStatusRespDto>>> getCustomerCollectionStatusList(
             @RequestParam("startDate") String startDate,
             @RequestParam("endDate") String endDate,
-            @RequestParam(value = "customerCode", required = false) Integer customerCode) {
+            @RequestParam(value = "customerCode", required = false) Integer customerCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별잔액현황 조회 요청 - 기간: {}~{}, 거래처: {}", startDate, endDate, customerCode);
+        log.info("거래처별잔액현황 조회 요청 - 기간: {}~{}, 거래처: {}, hqCode: {}", startDate, endDate, customerCode, hqCode);
         
         CustomerCollectionStatusSearchDto searchDto = CustomerCollectionStatusSearchDto.builder()
                 .startDate(startDate)
                 .endDate(endDate)
                 .customerCode(customerCode)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<CustomerCollectionStatusRespDto>> response = customerCollectionStatusService.getCustomerCollectionStatusList(searchDto);

@@ -29,10 +29,11 @@ public class CustomerDepositStatusController {
             @RequestParam("endDate") String endDate,
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
             @RequestParam(value = "brandCode", required = false) Integer brandCode,
-            @RequestParam(value = "depositMethod", required = false) String depositMethod) {
+            @RequestParam(value = "depositMethod", required = false) Integer depositMethod,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("거래처별수금현황 조회 요청 - 기간: {}~{}, 거래처: {}, 브랜드: {}, 입금유형: {}", 
-                startDate, endDate, customerCode, brandCode, depositMethod);
+        log.info("거래처별수금현황 조회 요청 - 기간: {}~{}, 거래처: {}, 브랜드: {}, 입금유형: {}, hqCode: {}", 
+                startDate, endDate, customerCode, brandCode, depositMethod, hqCode);
         
         CustomerDepositStatusSearchDto searchDto = CustomerDepositStatusSearchDto.builder()
                 .startDate(startDate)
@@ -40,6 +41,7 @@ public class CustomerDepositStatusController {
                 .customerCode(customerCode)
                 .brandCode(brandCode)
                 .depositMethod(depositMethod)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<CustomerDepositStatusRespDto>> response = customerDepositStatusService.getCustomerDepositStatusList(searchDto);

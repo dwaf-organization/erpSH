@@ -1,0 +1,29 @@
+package com.inc.sh.dto.customerAdjustment.reqDto;
+
+import lombok.*;
+
+import java.util.List;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CustomerAdjustmentSaveReqDto {
+    
+    private List<CustomerAdjustmentSaveItemDto> adjustments;    // 조정처리 배열
+    
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CustomerAdjustmentSaveItemDto {
+        private Integer transactionCode;    // 거래내역코드 (null이면 신규생성, 값이 있으면 수정)
+        private Integer customerCode;       // 거래처코드
+        private String adjustmentDate;      // 조정일자 (YYYYMMDD)
+        private String transactionType;     // 거래유형 (조정 default)
+        private Integer adjustmentAmount;   // 조정금액 (+, - 가능)
+        private String note;                // 비고
+    }
+}

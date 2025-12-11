@@ -53,4 +53,25 @@ public interface WarehouseItemsRepository extends JpaRepository<WarehouseItems, 
            "WHERE wi.warehouse_code = :warehouseCode " +
            "ORDER BY wi.item_code", nativeQuery = true)
     List<Object[]> findWarehouseItemsForTransfer(@Param("warehouseCode") Integer warehouseCode);
+
+    /**
+     * 출고창고 품목 조회 (이송용, 본사별)
+     */
+    @Query(value = "SELECT " +
+           "wi.item_code, " +
+           "i.item_name, " +
+           "i.specification, " +
+           "i.purchase_unit, " +
+           "wi.current_quantity, " +
+           "i.base_price " +
+           "FROM warehouse_items wi " +
+           "JOIN item i ON wi.item_code = i.item_code " +
+           "JOIN warehouse w ON wi.warehouse_code = w.warehouse_code " +
+           "WHERE wi.warehouse_code = :warehouseCode " +
+           "AND w.hq_code = :hqCode " +
+           "ORDER BY wi.item_code", nativeQuery = true)
+    List<Object[]> findWarehouseItemsForTransferWithHqCode(
+        @Param("warehouseCode") Integer warehouseCode,
+        @Param("hqCode") Integer hqCode
+    );
 }

@@ -27,14 +27,17 @@ public class CustomerDepositStatusService {
     @Transactional(readOnly = true)
     public RespDto<List<CustomerDepositStatusRespDto>> getCustomerDepositStatusList(CustomerDepositStatusSearchDto searchDto) {
         try {
-            log.info("거래처별수금현황 조회 시작 - 조건: {}", searchDto);
+            log.info("거래처별수금현황 조회 시작 - hqCode: {}, 기간: {}~{}, 거래처: {}, 브랜드: {}, 입금유형: {}", 
+                    searchDto.getHqCode(), searchDto.getStartDate(), searchDto.getEndDate(), 
+                    searchDto.getCustomerCode(), searchDto.getBrandCode(), searchDto.getDepositMethod());
             
-            List<Object[]> results = depositsRepository.findCustomerDepositStatusWithConditions(
+            List<Object[]> results = depositsRepository.findCustomerDepositStatusWithConditionsWithHqCode(
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
                     searchDto.getCustomerCode(),
                     searchDto.getBrandCode(),
-                    searchDto.getDepositMethod()
+                    searchDto.getDepositMethod(),
+                    searchDto.getHqCode()
             );
             
             List<CustomerDepositStatusRespDto> responseList = results.stream()
@@ -44,17 +47,17 @@ public class CustomerDepositStatusService {
                             .customerCode((Integer) result[2])
                             .customerName((String) result[3])
                             .depositAmount(((Number) result[4]).intValue())
-                            .depositMethod((String) result[5])
-                            .depositMethodName(getDepositMethodName((String) result[5]))
+                            .depositMethod((Integer) result[5])
+                            .depositMethodName(getDepositMethodName((Integer) result[5]))
                             .note((String) result[6])
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("거래처별수금현황 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("거래처별수금현황 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("거래처별수금현황 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("거래처별수금현황 조회 중 오류 발생", e);
+            log.error("거래처별수금현황 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("거래처별수금현황 조회 중 오류가 발생했습니다.");
         }
     }
@@ -78,13 +81,13 @@ public class CustomerDepositStatusService {
     /**
      * 입금유형명 변환 (0=일반입금, 1=가상계좌)
      */
-    private String getDepositMethodName(String depositMethod) {
-        if ("0".equals(depositMethod)) {
+    private String getDepositMethodName(Integer depositMethod) {
+        if (depositMethod == 0) {
             return "일반입금";
         } else if ("1".equals(depositMethod)) {
             return "가상계좌";
         } else {
-            return depositMethod; // 원본 값 반환
+            return "올바르지않은 입금유형"; // 원본 값 반환
         }
     }
 }

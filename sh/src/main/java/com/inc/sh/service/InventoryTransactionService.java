@@ -28,14 +28,17 @@ public class InventoryTransactionService {
     @Transactional(readOnly = true)
     public RespDto<List<InventoryTransactionRespDto>> getInventoryTransactionSummary(InventoryTransactionSearchDto searchDto) {
         try {
-            log.info("재고수불부 조회 시작 - 조건: {}", searchDto);
+            log.info("재고수불부 조회 시작 - hqCode: {}, 조회기간: {}~{}, 창고코드: {}, 분류코드: {}, 품목코드검색: {}", 
+                    searchDto.getHqCode(), searchDto.getStartDate(), searchDto.getEndDate(), 
+                    searchDto.getWarehouseCode(), searchDto.getCategoryCode(), searchDto.getItemCodeSearch());
             
-            List<Object[]> results = inventoryTransactionsRepository.findInventoryTransactionSummary(
+            List<Object[]> results = inventoryTransactionsRepository.findInventoryTransactionSummaryWithHqCode(
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
                     searchDto.getWarehouseCode(),
                     searchDto.getCategoryCode(),
-                    searchDto.getItemCodeSearch()
+                    searchDto.getItemCodeSearch(),
+                    searchDto.getHqCode()
             );
             
             List<InventoryTransactionRespDto> responseList = results.stream()
@@ -54,11 +57,11 @@ public class InventoryTransactionService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("재고수불부 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("재고수불부 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("재고수불부 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("재고수불부 조회 중 오류 발생", e);
+            log.error("재고수불부 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("재고수불부 조회 중 오류가 발생했습니다.");
         }
     }

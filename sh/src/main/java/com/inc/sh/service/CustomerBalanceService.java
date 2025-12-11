@@ -27,11 +27,11 @@ public class CustomerBalanceService {
      * 브랜드별 후입금 거래처 미수잔액 조회
      */
     @Transactional(readOnly = true)
-    public RespDto<List<CustomerBalanceRespDto>> getCustomerBalanceList(Integer brandCode) {
+    public RespDto<List<CustomerBalanceRespDto>> getCustomerBalanceList(Integer brandCode, Integer hqCode) {
         try {
-            log.info("거래처미수잔액 조회 시작 - 브랜드코드: {}", brandCode);
+            log.info("거래처미수잔액 조회 시작 - 브랜드코드: {}, hqCode: {}", brandCode, hqCode);
             
-            List<Object[]> results = customerRepository.findCustomerBalanceByBrandCode(brandCode);
+            List<Object[]> results = customerRepository.findCustomerBalanceByBrandCodeWithHqCode(brandCode, hqCode);
             
             List<CustomerBalanceRespDto> responseList = results.stream()
                     .map(result -> CustomerBalanceRespDto.builder()
@@ -43,11 +43,11 @@ public class CustomerBalanceService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("거래처미수잔액 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("거래처미수잔액 조회 완료 - hqCode: {}, 조회 건수: {}", hqCode, responseList.size());
             return RespDto.success("거래처미수잔액 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("거래처미수잔액 조회 중 오류 발생", e);
+            log.error("거래처미수잔액 조회 중 오류 발생 - hqCode: {}", hqCode, e);
             return RespDto.fail("거래처미수잔액 조회 중 오류가 발생했습니다.");
         }
     }

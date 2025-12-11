@@ -13,4 +13,5 @@ public class WarehouseTransferListSearchDto {
     private String endYm;               // 종료년월 (YYYYMM)
     private Integer fromWarehouseCode;  // 출고창고코드 (null이면 전체)
     private Integer toWarehouseCode;    // 입고창고코드 (null이면 전체)
+    private Integer hqCode;             // 본사코드
 }

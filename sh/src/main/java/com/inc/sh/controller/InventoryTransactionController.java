@@ -29,10 +29,11 @@ public class InventoryTransactionController {
             @RequestParam("endDate") String endDate,
             @RequestParam(value = "warehouseCode", required = false) Integer warehouseCode,
             @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "itemCodeSearch", required = false) String itemCodeSearch) {
+            @RequestParam(value = "itemCodeSearch", required = false) String itemCodeSearch,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("재고수불부 조회 요청 - 조회기간: {}~{}, 창고코드: {}, 분류코드: {}, 품목코드검색: {}", 
-                startDate, endDate, warehouseCode, categoryCode, itemCodeSearch);
+        log.info("재고수불부 조회 요청 - 조회기간: {}~{}, 창고코드: {}, 분류코드: {}, 품목코드검색: {}, hqCode: {}", 
+                startDate, endDate, warehouseCode, categoryCode, itemCodeSearch, hqCode);
         
         InventoryTransactionSearchDto searchDto = InventoryTransactionSearchDto.builder()
                 .startDate(startDate)
@@ -40,6 +41,7 @@ public class InventoryTransactionController {
                 .warehouseCode(warehouseCode)
                 .categoryCode(categoryCode)
                 .itemCodeSearch(itemCodeSearch)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<InventoryTransactionRespDto>> response = inventoryTransactionService.getInventoryTransactionSummary(searchDto);

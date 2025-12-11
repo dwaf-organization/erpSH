@@ -71,7 +71,7 @@ public interface RoleRepository extends JpaRepository<Role, Integer> {
     List<Role> findByHqCodeOrderByRoleCode(@Param("hqCode") Integer hqCode);
 
     /**
-     * 권한 검색 조회 (화면권한관리용)
+     * 권한 검색 조회 (hqCode 조건 추가)
      */
     @Query(value = "SELECT " +
            "r.role_code, " +
@@ -79,10 +79,12 @@ public interface RoleRepository extends JpaRepository<Role, Integer> {
            "r.note, " +
            "r.hq_code " +
            "FROM role r " +
-           "WHERE (:roleCode IS NULL OR CAST(r.role_code AS CHAR) LIKE CONCAT('%', :roleCode, '%')) " +
+           "WHERE r.hq_code = :hqCode " +
+           "AND (:roleCode IS NULL OR CAST(r.role_code AS CHAR) LIKE CONCAT('%', :roleCode, '%')) " +
            "AND (:roleName IS NULL OR r.role_name LIKE CONCAT('%', :roleName, '%')) " +
            "ORDER BY r.role_code", nativeQuery = true)
-    List<Object[]> findRolesByConditions(
+    List<Object[]> findRolesByConditionsAndHqCode(
+        @Param("hqCode") Integer hqCode,
         @Param("roleCode") String roleCode,
         @Param("roleName") String roleName
     );
