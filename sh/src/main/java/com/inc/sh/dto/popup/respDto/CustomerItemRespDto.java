@@ -29,11 +29,11 @@ public class CustomerItemRespDto {
     
     // 가격 정보 (거래처별 or 기본가격)
     private Integer orderUnitPrice;              // 기준단가
-    private Integer supplyAmt;            // 공급가액
-    private Integer vatAmt;              // 부가세액
-    private Integer taxableAmt;          // 과세액
-    private Integer taxFreeAmt;         // 면세액
-    private Integer totalAmt;            // 총액
+    private Integer supplyAmtBasic;            // 공급가액
+    private Integer vatAmtBasic;              // 부가세액
+    private Integer taxableAmtBasic;          // 과세액
+    private Integer taxFreeAmtBasic;         // 면세액
+    private Integer totalAmtBasic;            // 총액
     
     // 주문 관련 정보
     private Integer orderAvailableYn;       // 주문가능여부
