@@ -17,6 +17,7 @@ public class CustomerItemRespDto {
     private String taxTarget;
     private String vatDetail;
     private String origin;
+    private Integer priceType;
     private Integer categoryCode;
     private String categoryName;
     

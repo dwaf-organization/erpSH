@@ -329,7 +329,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "i.min_order_qty, " +               // 20
            "i.max_order_qty, " +               // 21
            "i.deadline_day, " +                 // 22
-           "i.deadline_time " +                 // 23
+           "i.deadline_time, " +                 // 23
+           "i.price_type " +                 // 24
            "FROM customer c " +
            "INNER JOIN warehouse w ON c.dist_center_code = w.dist_center_code " +
            "INNER JOIN warehouse_items wi ON w.warehouse_code = wi.warehouse_code " +

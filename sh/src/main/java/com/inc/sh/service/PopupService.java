@@ -337,6 +337,7 @@ public class PopupService {
                 .maxOrderQty(safeIntegerCast(result[21]))
                 .deadlineDay(safeIntegerCast(result[22]))
                 .deadlineTime(safeStringCast(result[23]))
+                .priceType(safeIntegerCast(result[24]))
                 .build();
     }
     
