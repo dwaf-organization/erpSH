@@ -26,13 +26,16 @@ public class MonthlyInventoryStatusService {
     @Transactional(readOnly = true)
     public RespDto<List<MonthlyInventoryStatusRespDto>> getMonthlyInventoryStatusList(MonthlyInventoryStatusSearchDto searchDto) {
         try {
-            log.info("월재고현황 조회 시작 - 조건: {}", searchDto);
+            log.info("월재고현황 조회 시작 - hqCode: {}, 마감년월: {}, 창고코드: {}, 분류코드: {}, 품목검색: {}", 
+                    searchDto.getHqCode(), searchDto.getClosingYm(), searchDto.getWarehouseCode(), 
+                    searchDto.getCategoryCode(), searchDto.getItemSearch());
             
-            List<Object[]> results = monthlyInventoryClosingRepository.findMonthlyInventoryStatusByConditions(
+            List<Object[]> results = monthlyInventoryClosingRepository.findMonthlyInventoryStatusByConditionsWithHqCode(
                     searchDto.getClosingYm(),
                     searchDto.getWarehouseCode(),
                     searchDto.getCategoryCode(),
-                    searchDto.getItemSearch()
+                    searchDto.getItemSearch(),
+                    searchDto.getHqCode()
             );
             
             List<MonthlyInventoryStatusRespDto> responseList = results.stream()
@@ -58,11 +61,11 @@ public class MonthlyInventoryStatusService {
                             .build())
                     .collect(Collectors.toList());
             
-            log.info("월재고현황 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("월재고현황 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("월재고현황 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("월재고현황 조회 중 오류 발생", e);
+            log.error("월재고현황 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("월재고현황 조회 중 오류가 발생했습니다.");
         }
     }

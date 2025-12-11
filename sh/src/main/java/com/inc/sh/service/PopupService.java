@@ -321,7 +321,7 @@ public class PopupService {
                 .origin(safeStringCast(result[6]))
                 .categoryCode(safeIntegerCast(result[7]))
                 .categoryName(safeStringCast(result[8]))
-                .warehouseCode(safeIntegerCast(result[9]))
+                .releaseWarehouseCode(safeIntegerCast(result[9]))
                 .warehouseName(safeStringCast(result[10]))
                 .currentStockQty(safeIntegerCast(result[11]))
                 .safeQuantity(safeIntegerCast(result[12]))

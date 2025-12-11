@@ -22,7 +22,7 @@ public class CustomerItemRespDto {
     private String categoryName;
     
     // 창고 재고 정보
-    private Integer warehouseCode;
+    private Integer releaseWarehouseCode;
     private String warehouseName;
     private Integer currentStockQty;        // 현재고량
     private Integer safeQuantity;           // 안전재고

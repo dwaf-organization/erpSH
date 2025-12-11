@@ -11,4 +11,5 @@ public class MonthlyClosingSearchDto {
     
     private String closingYm;           // 마감년월 (필수)
     private Integer warehouseCode;      // 창고코드 (선택)
+    private Integer hqCode;             // 본사코드
 }

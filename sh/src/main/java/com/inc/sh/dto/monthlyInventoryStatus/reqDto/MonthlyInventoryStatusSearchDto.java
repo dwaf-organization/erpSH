@@ -13,4 +13,5 @@ public class MonthlyInventoryStatusSearchDto {
     private Integer warehouseCode;      // 창고코드 (선택, 완전일치)
     private Integer categoryCode;       // 분류코드 (선택, 완전일치)
     private String itemSearch;          // 품목 검색어 (품목코드 부분검색)
+    private Integer hqCode;             // 본사코드
 }

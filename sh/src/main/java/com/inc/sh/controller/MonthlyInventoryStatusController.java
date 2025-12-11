@@ -28,16 +28,18 @@ public class MonthlyInventoryStatusController {
             @RequestParam("closingYm") String closingYm,
             @RequestParam(value = "warehouseCode", required = false) Integer warehouseCode,
             @RequestParam(value = "categoryCode", required = false) Integer categoryCode,
-            @RequestParam(value = "itemSearch", required = false) String itemSearch) {
+            @RequestParam(value = "itemSearch", required = false) String itemSearch,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("월재고현황 조회 요청 - 마감년월: {}, 창고코드: {}, 분류코드: {}, 품목검색: {}", 
-                closingYm, warehouseCode, categoryCode, itemSearch);
+        log.info("월재고현황 조회 요청 - 마감년월: {}, 창고코드: {}, 분류코드: {}, 품목검색: {}, hqCode: {}", 
+                closingYm, warehouseCode, categoryCode, itemSearch, hqCode);
         
         MonthlyInventoryStatusSearchDto searchDto = MonthlyInventoryStatusSearchDto.builder()
                 .closingYm(closingYm)
                 .warehouseCode(warehouseCode)
                 .categoryCode(categoryCode)
                 .itemSearch(itemSearch)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<MonthlyInventoryStatusRespDto>> response = monthlyInventoryStatusService.getMonthlyInventoryStatusList(searchDto);

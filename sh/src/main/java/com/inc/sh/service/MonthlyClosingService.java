@@ -31,11 +31,13 @@ public class MonthlyClosingService {
     @Transactional(readOnly = true)
     public RespDto<List<MonthlyClosingRespDto>> getMonthlyClosingList(MonthlyClosingSearchDto searchDto) {
         try {
-            log.info("월재고마감 현황 조회 시작 - 조건: {}", searchDto);
+            log.info("월재고마감 현황 조회 시작 - hqCode: {}, 마감년월: {}, 창고코드: {}", 
+                    searchDto.getHqCode(), searchDto.getClosingYm(), searchDto.getWarehouseCode());
             
-            List<Object[]> results = monthlyInventoryClosingRepository.findMonthlyClosingByConditions(
+            List<Object[]> results = monthlyInventoryClosingRepository.findMonthlyClosingByConditionsWithHqCode(
                     searchDto.getClosingYm(),
-                    searchDto.getWarehouseCode()
+                    searchDto.getWarehouseCode(),
+                    searchDto.getHqCode()
             );
             
             List<MonthlyClosingRespDto> responseList = results.stream()
@@ -49,22 +51,32 @@ public class MonthlyClosingService {
                             }
                         }
                         
+                        // Boolean을 Integer로 안전하게 변환
+                        Integer isClosedValue = 0;
+                        if (result[3] != null) {
+                            if (result[3] instanceof Boolean) {
+                                isClosedValue = ((Boolean) result[3]) ? 1 : 0;
+                            } else if (result[3] instanceof Number) {
+                                isClosedValue = ((Number) result[3]).intValue();
+                            }
+                        }
+                        
                         return MonthlyClosingRespDto.builder()
                                 .warehouseCode((Integer) result[0])
                                 .warehouseName((String) result[1])
                                 .closingYm((String) result[2])
-                                .isClosed(((Number) result[3]).intValue())
+                                .isClosed(isClosedValue)
                                 .closedAt(closedAt)
                                 .closedUser((String) result[5])
                                 .build();
                     })
                     .collect(Collectors.toList());
             
-            log.info("월재고마감 현황 조회 완료 - 조회 건수: {}", responseList.size());
+            log.info("월재고마감 현황 조회 완료 - hqCode: {}, 조회 건수: {}", searchDto.getHqCode(), responseList.size());
             return RespDto.success("월재고마감 현황 조회 성공", responseList);
             
         } catch (Exception e) {
-            log.error("월재고마감 현황 조회 중 오류 발생", e);
+            log.error("월재고마감 현황 조회 중 오류 발생 - hqCode: {}", searchDto.getHqCode(), e);
             return RespDto.fail("월재고마감 현황 조회 중 오류가 발생했습니다.");
         }
     }

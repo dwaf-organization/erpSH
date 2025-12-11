@@ -27,13 +27,15 @@ public class MonthlyClosingController {
     @GetMapping("/list")
     public ResponseEntity<RespDto<List<MonthlyClosingRespDto>>> getMonthlyClosingList(
             @RequestParam("closingYm") String closingYm,
-            @RequestParam(value = "warehouseCode", required = false) Integer warehouseCode) {
+            @RequestParam(value = "warehouseCode", required = false) Integer warehouseCode,
+            @RequestParam("hqCode") Integer hqCode) {
         
-        log.info("월재고마감 현황 조회 요청 - 마감년월: {}, 창고코드: {}", closingYm, warehouseCode);
+        log.info("월재고마감 현황 조회 요청 - 마감년월: {}, 창고코드: {}, hqCode: {}", closingYm, warehouseCode, hqCode);
         
         MonthlyClosingSearchDto searchDto = MonthlyClosingSearchDto.builder()
                 .closingYm(closingYm)
                 .warehouseCode(warehouseCode)
+                .hqCode(hqCode)
                 .build();
         
         RespDto<List<MonthlyClosingRespDto>> response = monthlyClosingService.getMonthlyClosingList(searchDto);
