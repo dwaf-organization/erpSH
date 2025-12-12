@@ -289,6 +289,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "LEFT JOIN brand_info b ON c.brand_code = b.brand_code " +
            "LEFT JOIN dist_center d ON c.dist_center_code = d.dist_center_code " +
            "WHERE c.hq_code = :hqCode " +
+           "AND c.close_dt IS NULL " +
            "AND (:customerSearch IS NULL OR " +
            "     CAST(c.customer_code AS CHAR) LIKE CONCAT('%', :customerSearch, '%') OR " +
            "     c.customer_name LIKE CONCAT('%', :customerSearch, '%')) " +

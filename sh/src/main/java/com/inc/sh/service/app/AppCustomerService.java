@@ -19,7 +19,10 @@ import com.inc.sh.repository.OrderRepository;
 import com.inc.sh.repository.ReturnRepository;
 import com.inc.sh.repository.DepositsRepository;
 import com.inc.sh.repository.VirtualAccountRepository;
+import com.inc.sh.service.AccessLogService;
 import com.inc.sh.util.HqAccessCodeGenerator;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -50,6 +53,9 @@ public class AppCustomerService {
     private final DepositsRepository depositsRepository;
     private final VirtualAccountRepository virtualAccountRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    
+    // AccessLogService 의존성 추가 필요
+    private final AccessLogService accessLogService;
     
     /**
      * [앱전용] 본사접속코드 검증
@@ -252,6 +258,85 @@ public class AppCustomerService {
         } catch (Exception e) {
             log.error("[앱] 가상계좌 정보 조회 중 오류 발생 - customerCode: {}", customerCode, e);
             return RespDto.fail("가상계좌 정보 조회 중 오류가 발생했습니다.");
+        }
+    }
+    
+    /**
+     * [앱전용] 고객 사용자 로그인 (로그 기능 추가)
+     */
+    @Transactional(readOnly = true)
+    public RespDto<AppLoginRespDto> login(AppLoginReqDto request, HttpServletRequest httpRequest) {
+        try {
+            log.info("[앱] 로그인 시도 - customerUserId: {}", request.getCustomerUserId());
+            
+            // 사용자 조회
+            CustomerUser customerUser = customerUserRepository.findByCustomerUserId(request.getCustomerUserId());
+            
+            if (customerUser == null) {
+                log.warn("[앱] 존재하지 않는 아이디 - customerUserId: {}", request.getCustomerUserId());
+                
+                // 실패 로그 기록 (hqCode는 고객 정보에서 가져올 수 없으므로 null 처리 또는 별도 로직)
+                accessLogService.logFailureAccess("CUSTOMER", request.getCustomerUserId(), 
+                        null, "사용자정보 없음", httpRequest);
+                return RespDto.fail("아이디가 틀림");
+            }
+            
+            // 퇴사 여부 확인
+            if (customerUser.getEndYn() != null && customerUser.getEndYn() == 1) {
+                log.warn("[앱] 퇴사한 사용자 로그인 시도 - customerUserId: {}", request.getCustomerUserId());
+                
+                // 실패 로그 기록
+                accessLogService.logFailureAccess("CUSTOMER", String.valueOf(customerUser.getCustomerUserCode()), 
+                        getHqCodeByCustomerCode(customerUser.getCustomerCode()), "퇴사한 사용자", httpRequest);
+                return RespDto.fail("퇴사로 인한 로그인 불가");
+            }
+            
+            // 비밀번호 검증
+            if (!passwordEncoder.matches(request.getCustomerUserPw(), customerUser.getCustomerUserPw())) {
+                log.warn("[앱] 비밀번호 불일치 - customerUserId: {}", request.getCustomerUserId());
+                
+                // 실패 로그 기록
+                accessLogService.logFailureAccess("CUSTOMER", String.valueOf(customerUser.getCustomerUserCode()), 
+                        getHqCodeByCustomerCode(customerUser.getCustomerCode()), "비밀번호 불일치", httpRequest);
+                return RespDto.fail("비밀번호틀림");
+            }
+            
+            // 로그인 성공 로그 기록
+            accessLogService.logSuccessAccess("CUSTOMER", String.valueOf(customerUser.getCustomerUserCode()), 
+                    getHqCodeByCustomerCode(customerUser.getCustomerCode()), httpRequest);
+            
+            // 고객 정보 조회 (가상계좌코드 가져오기)
+            Customer customer = customerRepository.findByCustomerCode(customerUser.getCustomerCode());
+            
+            // 응답 생성
+            AppLoginRespDto responseDto = AppLoginRespDto.builder()
+                    .customerUserCode(customerUser.getCustomerUserCode())
+                    .customerCode(customerUser.getCustomerCode())
+                    .customerUserName(customerUser.getCustomerUserName())
+                    .virtualAccountCode(customer != null ? customer.getVirtualAccountCode() : null)
+                    .build();
+            
+            log.info("[앱] 로그인 성공 - customerUserCode: {}, customerCode: {}", 
+                    customerUser.getCustomerUserCode(), customerUser.getCustomerCode());
+            
+            return RespDto.success("로그인 성공", responseDto);
+            
+        } catch (Exception e) {
+            log.error("[앱] 로그인 중 오류 발생 - customerUserId: {}", request.getCustomerUserId(), e);
+            return RespDto.fail("로그인 중 오류가 발생했습니다.");
+        }
+    }
+    
+    /**
+     * 거래처코드로 본사코드 조회 (로그용)
+     */
+    private Integer getHqCodeByCustomerCode(Integer customerCode) {
+        try {
+            Customer customer = customerRepository.findByCustomerCode(customerCode);
+            return customer != null ? customer.getHqCode() : null;
+        } catch (Exception e) {
+            log.warn("본사코드 조회 실패 - customerCode: {}", customerCode);
+            return null;
         }
     }
 }

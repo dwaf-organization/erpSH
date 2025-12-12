@@ -9,6 +9,8 @@ import com.inc.sh.entity.Headquarter;
 import com.inc.sh.entity.User;
 import com.inc.sh.repository.HeadquarterRepository;
 import com.inc.sh.repository.UserRepository;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +24,9 @@ public class SigninService {
     
     private final HeadquarterRepository headquarterRepository;
     private final UserRepository userRepository;
+    
+    private final AccessLogService accessLogService;
+    
     private final PasswordEncoder passwordEncoder;
     
     /**
@@ -97,4 +102,57 @@ public class SigninService {
             return RespDto.fail("로그인 중 오류가 발생했습니다.");
         }
     }
+    
+    /**
+     * 사원 로그인 (로그 기능 추가)
+     */
+    @Transactional(readOnly = true)
+    public RespDto<UserSigninRespDto> signin(UserSigninDto signinDto, HttpServletRequest request) {
+        try {
+            log.info("사원 로그인 시작 - hqCode: {}, userCode: {}", 
+                    signinDto.getHqCode(), signinDto.getUserCode());
+            
+            // 1. 본사코드와 사원코드로 사원 조회
+            User user = userRepository.findByHqCodeAndUserCode(
+                    signinDto.getHqCode(), signinDto.getUserCode());
+            if (user == null) {
+                // 실패 로그 기록
+                accessLogService.logFailureAccess("ERP", signinDto.getUserCode(), 
+                        signinDto.getHqCode(), "사원정보 없음", request);
+                return RespDto.fail("존재하지 않는 사원정보입니다.");
+            }
+            
+            // 2. 비밀번호 확인
+            if (!passwordEncoder.matches(signinDto.getUserPw(), user.getUserPw())) {
+                log.warn("비밀번호 불일치 - hqCode: {}, userCode: {}", 
+                        signinDto.getHqCode(), signinDto.getUserCode());
+                
+                // 실패 로그 기록
+                accessLogService.logFailureAccess("ERP", signinDto.getUserCode(), 
+                        signinDto.getHqCode(), "비밀번호 불일치", request);
+                return RespDto.fail("비밀번호가 올바르지 않습니다.");
+            }
+            
+            // 3. 로그인 성공 로그 기록
+            accessLogService.logSuccessAccess("ERP", user.getUserCode(), 
+                    user.getHqCode(), request);
+            
+            // 4. 응답 데이터 구성
+            UserSigninRespDto responseData = UserSigninRespDto.builder()
+                    .userCode(user.getUserCode())
+                    .roleCode(user.getRoleCode())
+                    .userName(user.getUserName())
+                    .build();
+            
+            log.info("사원 로그인 성공 - userCode: {}, userName: {}, roleCode: {}", 
+                    user.getUserCode(), user.getUserName(), user.getRoleCode());
+            
+            return RespDto.success("로그인 성공", responseData);
+            
+        } catch (Exception e) {
+            log.error("사원 로그인 중 오류 발생", e);
+            return RespDto.fail("로그인 중 오류가 발생했습니다.");
+        }
+    }
+    
 }

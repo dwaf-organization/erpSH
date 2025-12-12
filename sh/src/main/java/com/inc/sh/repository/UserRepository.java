@@ -27,6 +27,11 @@ public interface UserRepository extends JpaRepository<User, String> {
     boolean existsByUserCode(@Param("userCode") String userCode);
     
     /**
+     * 관리자 - 권한별 사용자 조회 (본사 삭제시 사용)
+     */
+    List<User> findByRoleCode(@Param("roleCode") Integer roleCode);
+    
+    /**
      * 특정 prefix로 시작하는 마지막 사용자 코드 조회 (YYMM+hqCode+001 형태용)
      */
     @Query(value = "SELECT u.user_code " +
@@ -74,4 +79,47 @@ public interface UserRepository extends JpaRepository<User, String> {
      */
     @Query(value = "SELECT u.role_code FROM user u WHERE u.user_code = :userCode", nativeQuery = true)
     Integer findRoleCodeByUserCode(@Param("userCode") String userCode);
+    
+    /**
+     * 관리자 - 사용자 목록 조회 (본사명, 권한명 포함)
+     */
+    @Query(value = "SELECT " +
+           "u.user_code, " +
+           "u.user_name, " +
+           "u.hq_code, " +
+           "h.company_name as hq_name, " +
+           "u.role_code, " +
+           "r.role_name, " +
+           "u.phone1, " +
+           "u.phone2, " +
+           "u.email, " +
+           "u.resignation_dt " +
+           "FROM user u " +
+           "LEFT JOIN headquarter h ON u.hq_code = h.hq_code " +
+           "LEFT JOIN role r ON u.role_code = r.role_code " +
+           "WHERE (:hqCode IS NULL OR u.hq_code = :hqCode) " +
+           "ORDER BY u.user_code", nativeQuery = true)
+    List<Object[]> findUsersForAdmin(@Param("hqCode") Integer hqCode);
+    
+    /**
+     * 관리자 - 사용자 상세 조회 (본사명, 권한명 포함) - 리턴타입 수정
+     */
+    @Query(value = "SELECT " +
+           "u.user_code, " +          // 0
+           "u.user_name, " +          // 1  
+           "u.hq_code, " +            // 2
+           "h.company_name, " +       // 3
+           "u.role_code, " +          // 4
+           "r.role_name, " +          // 5
+           "u.phone1, " +             // 6
+           "u.phone2, " +             // 7
+           "u.email, " +              // 8
+           "u.resignation_dt, " +     // 9
+           "u.created_at, " +         // 10
+           "u.updated_at " +          // 11
+           "FROM user u " +
+           "LEFT JOIN headquarter h ON u.hq_code = h.hq_code " +
+           "LEFT JOIN role r ON u.role_code = r.role_code " +
+           "WHERE u.user_code = :userCode", nativeQuery = true)
+    List<Object[]> findUserDetailForAdmin(@Param("userCode") String userCode);
 }

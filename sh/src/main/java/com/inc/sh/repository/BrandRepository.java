@@ -26,4 +26,20 @@ public interface BrandRepository extends JpaRepository<BrandInfo, Integer> {
     // 브랜드 사용 여부 확인 (order_limit_set 테이블에서 참조 확인)
     @Query(value = "SELECT COUNT(*) FROM order_limit_set WHERE brand_code = :brandCode", nativeQuery = true)
     Long countOrderLimitSetByBrandCode(@Param("brandCode") Integer brandCode);
+    
+    /**
+     * 관리자 - 브랜드 목록 조회 (본사명 포함)
+     */
+    @Query(value = "SELECT " +
+           "b.brand_code, " +         // 0
+           "b.brand_name, " +         // 1
+           "b.hq_code, " +            // 2
+           "h.company_name, " +       // 3
+           "b.note " +                // 4
+           "FROM brand_info b " +
+           "LEFT JOIN headquarter h ON b.hq_code = h.hq_code " +
+           "WHERE (:hqCode IS NULL OR b.hq_code = :hqCode) " +
+           "ORDER BY b.brand_code", nativeQuery = true)
+    List<Object[]> findBrandsForAdmin(@Param("hqCode") Integer hqCode);
+    
 }
