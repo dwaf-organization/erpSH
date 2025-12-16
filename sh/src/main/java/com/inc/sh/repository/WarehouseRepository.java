@@ -26,7 +26,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     /**
      * 창고에 재고가 있는 품목 개수 확인
      */
-    @Query(value = "SELECT COUNT(*) FROM inventory i WHERE i.warehouse_code = :warehouseCode AND i.current_stock > 0", 
+    @Query(value = "SELECT COUNT(*) FROM warehouse_items i WHERE i.warehouse_code = :warehouseCode AND i.current_quantity > 0", 
            nativeQuery = true)
     Long countInventoryByWarehouseCode(@Param("warehouseCode") Integer warehouseCode);
     
