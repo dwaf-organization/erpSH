@@ -862,8 +862,8 @@ public class OrderService {
                     .totalCount(request.getOrderNos().size())
                     .successCount(successList.size())
                     .failureCount(failureList.size())
-                    .successList(successList)
-                    .failureList(failureList)
+                    .successData(successList)
+                    .failData(failureList)
                     .build();
             
             log.info("주문 다중 결제완료 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 

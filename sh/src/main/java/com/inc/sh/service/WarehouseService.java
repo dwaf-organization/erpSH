@@ -47,7 +47,7 @@ public class WarehouseService {
             log.info("창고 목록 조회 시작 - warehouseCode: {}, distCenterCode: {}, hqCode: {}", 
                     searchDto.getWarehouseCode(), searchDto.getDistCenterCode(), searchDto.getHqCode());
             
-            List<Object[]> warehouses = warehouseRepository.findWarehousesWithDistCenterNameAndHqCode(
+            List<Object[]> warehouses = warehouseRepository.findWarehousesWithDistCenterNameAndHqCodeAll(
                     searchDto.getWarehouseCode(),
                     searchDto.getDistCenterCode(),
                     searchDto.getHqCode()

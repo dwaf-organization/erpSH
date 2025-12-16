@@ -66,6 +66,27 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
     );
     
     /**
+     * 창고 검색 조건으로 조회 (본사별, 물류센터명 포함)
+     * @param warehouseCode 창고코드 (완전일치, null 가능)
+     * @param distCenterCode 물류센터코드 (완전일치, null 가능)
+     * @param hqCode 본사코드 (완전일치, 필수)
+     * @return 조회된 창고 목록 (창고코드, 창고명, 물류센터명)
+     */
+    @Query("SELECT w.warehouseCode, w.distCenterCode, w.hqCode, w.warehouseName, \n"
+    		+ "       w.zipCode, w.addr, w.telNum, w.managerName, w.managerContact, \n"
+    		+ "       w.useYn, w.description, w.createdAt, w.updatedAt, dc.distCenterName " +
+           "FROM Warehouse w LEFT JOIN DistCenter dc ON w.distCenterCode = dc.distCenterCode " +
+           "WHERE (:warehouseCode IS NULL OR w.warehouseCode = :warehouseCode) AND " +
+           "(:distCenterCode IS NULL OR w.distCenterCode = :distCenterCode) AND " +
+           "w.hqCode = :hqCode " +
+           "ORDER BY w.warehouseCode ASC")
+    List<Object[]> findWarehousesWithDistCenterNameAndHqCodeAll(
+        @Param("warehouseCode") Integer warehouseCode,
+        @Param("distCenterCode") Integer distCenterCode,
+        @Param("hqCode") Integer hqCode
+    );
+    
+    /**
      * 창고코드로 조회
      */
     Warehouse findByWarehouseCode(Integer warehouseCode);

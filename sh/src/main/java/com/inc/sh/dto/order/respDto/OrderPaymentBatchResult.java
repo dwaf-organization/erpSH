@@ -15,8 +15,8 @@ public class OrderPaymentBatchResult {
     private int successCount;                                     // 성공 건수
     private int failureCount;                                     // 실패 건수
     
-    private List<OrderPaymentSuccessResult> successList;          // 성공 목록
-    private List<OrderPaymentFailureResult> failureList;          // 실패 목록
+    private List<OrderPaymentSuccessResult> successData;          // 성공 목록
+    private List<OrderPaymentFailureResult> failData;          // 실패 목록
     
     @Getter
     @Setter
