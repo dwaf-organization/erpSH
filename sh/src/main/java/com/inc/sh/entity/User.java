@@ -44,6 +44,10 @@ public class User {
     @Column(name = "resignation_dt", length = 250)
     private String resignationDt;
     
+    @Column(name = "ledger_usage_yn", nullable = false)
+    @Builder.Default
+    private Integer ledgerUsageYn = 0; // 0=사용불가, 1=사용가능
+    
     @Column(name = "description", length = 250)
     private String description;
     

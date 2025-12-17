@@ -26,7 +26,7 @@ public class Order {
     @Column(name = "customer_code", nullable = false)
     private Integer customerCode;
     
-    @Column(name = "vehicle_code", nullable = false)
+    @Column(name = "vehicle_code")
     private Integer vehicleCode;
     
     @Column(name = "dist_center_code", nullable = false)

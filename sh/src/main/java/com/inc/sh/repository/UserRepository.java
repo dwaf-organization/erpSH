@@ -53,7 +53,8 @@ public interface UserRepository extends JpaRepository<User, String> {
            "u.resignation_dt, " +
            "u.role_code, " +
            "r.role_name, " +
-           "u.user_pw " +
+           "u.user_pw, " +
+           "u.ledger_usage_yn " +
            "FROM user u " +
            "LEFT JOIN role r ON u.role_code = r.role_code " +
            "WHERE u.hq_code = :hqCode " +

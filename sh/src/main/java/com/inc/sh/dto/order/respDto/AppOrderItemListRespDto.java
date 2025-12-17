@@ -32,6 +32,7 @@ public class AppOrderItemListRespDto {
     private Integer deadlineDay;
     private String deadlineTime;
     private Integer currentQuantity;
-    private Integer warehouseCode;  // 새로 추가된 창고코드
+    private Integer warehouseCode;
     private Boolean isWishlist;
+    private Integer customerWishlistCode;
 }

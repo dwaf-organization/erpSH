@@ -25,7 +25,7 @@ public class AppCartService {
     private final WarehouseItemsRepository warehouseItemsRepository;
     
     /**
-     * 장바구니 담기
+     * 장바구니 담기 (금액 필드 추가)
      */
     @Transactional
     public RespDto<Integer> addToCart(CartAddReqDto request) {
@@ -59,22 +59,34 @@ public class AppCartService {
                 request.getWarehouseCode(), request.getItemCode()).orElse(null);
             Integer currentStockQty = (warehouseItems != null) ? warehouseItems.getCurrentQuantity() : 0;
             
-            // 거래처별 단가 확인 (item_customer_price 우선)
+            // ✅ 거래처별 단가 및 금액 정보 조회 (거래처단가 우선, 없으면 기본가격)
             Integer orderUnitPrice = item.getBasePrice(); // 기본값
+            Integer supplyPrice = item.getSupplyPrice(); // 기본값
+            Integer taxAmount = item.getTaxAmount(); // 기본값
+            Integer taxableAmount = item.getTaxableAmount(); // 기본값
+            Integer dutyFreeAmount = item.getDutyFreeAmount(); // 기본값
+            Integer totalAmount = item.getTotalAmount(); // 기본값
+            
             List<ItemCustomerPrice> customerPrices = itemCustomerPriceRepository.findByItemCode(request.getItemCode());
             for (ItemCustomerPrice cp : customerPrices) {
                 if (cp.getCustomerCode().equals(request.getCustomerCode())) {
+                    // 거래처별 단가가 있으면 해당 값들 사용
                     orderUnitPrice = cp.getCustomerSupplyPrice();
+                    supplyPrice = cp.getSupplyPrice();
+                    taxAmount = cp.getTaxAmount();
+                    taxableAmount = cp.getTaxableAmount();
+                    dutyFreeAmount = cp.getDutyFreeAmount();
+                    totalAmount = cp.getTotalAmount();
                     break;
                 }
             }
             
-            // 장바구니 추가
+            // 장바구니 추가 (금액 필드 포함)
             CustomerCart cart = CustomerCart.builder()
                 .customerUserCode(request.getCustomerUserCode())
                 .customerCode(request.getCustomerCode())
                 .itemCode(request.getItemCode())
-                .virtualAccountCode(null) // null 처리
+                .virtualAccountCode(null)
                 .warehouseCode(request.getWarehouseCode())
                 .itemName(item.getItemName())
                 .specification(item.getSpecification())
@@ -85,6 +97,12 @@ public class AppCartService {
                 .orderQty(request.getOrderQty())
                 .taxTarget(item.getVatType())
                 .warehouseName(warehouse.getWarehouseName())
+                // ✅ 금액 필드 추가
+                .supplyPrice(supplyPrice)
+                .taxAmount(taxAmount)
+                .taxableAmount(taxableAmount)
+                .dutyFreeAmount(dutyFreeAmount)
+                .totalAmount(totalAmount)
                 .description(null)
                 .build();
             
@@ -102,7 +120,7 @@ public class AppCartService {
     }
     
     /**
-     * 장바구니 조회
+     * 장바구니 조회 (금액 필드 포함)
      */
     @Transactional(readOnly = true)
     public RespDto<List<CartRespDto>> getCartList(Integer customerCode, Integer customerUserCode) {
@@ -127,6 +145,12 @@ public class AppCartService {
                     .orderQty(cart.getOrderQty())
                     .taxTarget(cart.getTaxTarget())
                     .warehouseName(cart.getWarehouseName())
+                    // ✅ 금액 필드 추가
+                    .supplyPrice(cart.getSupplyPrice())
+                    .taxAmount(cart.getTaxAmount())
+                    .taxableAmount(cart.getTaxableAmount())
+                    .dutyFreeAmount(cart.getDutyFreeAmount())
+                    .totalAmount(cart.getTotalAmount())
                     .description(cart.getDescription())
                     .createdAt(cart.getCreatedAt())
                     .updatedAt(cart.getUpdatedAt())
@@ -145,7 +169,7 @@ public class AppCartService {
     }
     
     /**
-     * 장바구니 삭제
+     * 장바구니 삭제 (기존과 동일)
      */
     @Transactional
     public RespDto<Void> deleteCartItem(Integer customerCartCode) {

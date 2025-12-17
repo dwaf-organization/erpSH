@@ -133,4 +133,24 @@ public class UserController {
         RespDto<UserBatchResult> response = userService.deleteUsers(request);
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * 장부대장 사용여부 조회
+     * GET /api/v1/erp/user/ledger-usage
+     */
+    @GetMapping("/ledger-usage")
+    public ResponseEntity<RespDto<Integer>> getLedgerUsage(
+            @RequestParam("hqCode") Integer hqCode,
+            @RequestParam("userCode") String userCode) {
+        
+        log.info("장부대장 사용여부 조회 요청 - hqCode: {}, userCode: {}", hqCode, userCode);
+        
+        RespDto<Integer> response = userService.getLedgerUsage(hqCode, userCode);
+        
+        if (response.getCode() == 1) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }

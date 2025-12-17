@@ -55,10 +55,10 @@ public class AppOrderCreateService {
             }
             
             // 4. 주문제한시간 체크
-            RespDto<String> timeLimitCheck = checkOrderTimeLimit(customer.getBrandCode());
-            if (timeLimitCheck.getCode() != 1) {
-                return RespDto.fail(timeLimitCheck.getMessage());
-            }
+//            RespDto<String> timeLimitCheck = checkOrderTimeLimit(customer.getBrandCode());
+//            if (timeLimitCheck.getCode() != 1) {
+//                return RespDto.fail(timeLimitCheck.getMessage());
+//            }
             
             // 5. 잔액 체크 및 주문 처리
             RespDto<AppOrderRespDto> orderResult = processOrderByDepositType(request, customer);
@@ -94,7 +94,7 @@ public class AppOrderCreateService {
             int dayIndex = dayOfWeek.getValue() - 1; // 월=0, 화=1, ... 토=5
             if (dayOfWeek == DayOfWeek.SUNDAY) dayIndex = 6; // 일=6
             
-            String deliveryDays = customer.getDeliveryWeekday(); // "1111111" 형태 (실제 Entity 필드명)
+            String deliveryDays = customer.getDeliveryWeekday(); // "1111111" 형태
             if (deliveryDays != null && deliveryDays.length() > dayIndex) {
                 char dayFlag = deliveryDays.charAt(dayIndex);
                 if (dayFlag == '0') {
@@ -114,13 +114,11 @@ public class AppOrderCreateService {
      */
     private RespDto<String> checkDeliveryHoliday(String deliveryRequestDt, Integer brandCode) {
         try {
-            // 브랜드별 배송휴일 조회하여 해당 날짜가 있는지 확인
-            List<DeliveryHoliday> holidays = deliveryHolidayRepository.findByBrandCode(brandCode);
+            // 브랜드별 특정 날짜 배송휴일 조회
+            List<DeliveryHoliday> holidays = deliveryHolidayRepository.findByBrandCodeAndHolidayDt(brandCode, deliveryRequestDt);
             
-            for (DeliveryHoliday holiday : holidays) {
-                if (holiday.getHolidayDt() != null && holiday.getHolidayDt().equals(deliveryRequestDt)) {
-                    return RespDto.fail("납기요청이 불가능한 휴일입니다");
-                }
+            if (holidays != null && !holidays.isEmpty()) {
+                return RespDto.fail("납기요청이 불가능한 휴일입니다");
             }
             
             return RespDto.success("배송휴일 체크 통과", "통과");
@@ -144,8 +142,8 @@ public class AppOrderCreateService {
             if (now.getDayOfWeek() == DayOfWeek.SUNDAY) dayIndex = 6; // 일=6
             String today = dayNames[dayIndex];
             
-            // 브랜드별 주문제한 설정 조회
-            List<OrderLimitSet> limits = orderLimitSetRepository.findByBrandCode(brandCode);
+            // 브랜드별 해당 요일 주문제한 설정 조회
+            List<OrderLimitSet> limits = orderLimitSetRepository.findByBrandCodeAndDayName(brandCode, today);
             
             // 해당 요일과 매칭하여 시간 체크
             for (OrderLimitSet limit : limits) {
@@ -234,17 +232,19 @@ public class AppOrderCreateService {
             // Order 생성
             Order order = Order.builder()
                     .orderNo(orderNo)
+                    .hqCode(customer.getHqCode())
                     .customerCode(customer.getCustomerCode())
+                    .vehicleCode(0) // 기본값
+                    .distCenterCode(customer.getDistCenterCode())
                     .customerName(customer.getCustomerName())
                     .bizNum(customer.getBizNum())
+                    .addr(customer.getAddr())
                     .ownerName(customer.getOwnerName())
                     .telNum(customer.getTelNum())
-                    .addr(customer.getAddr())
                     .orderDt(today)
                     .deliveryRequestDt(request.getDeliveryRequestDt())
                     .orderMessage(request.getOrderMessage())
                     .depositTypeCode(customer.getDepositTypeCode())
-                    .distCenterCode(customer.getDistCenterCode())
                     .taxableAmt(request.getTaxableAmt())
                     .taxFreeAmt(request.getTaxFreeAmt())
                     .supplyAmt(request.getSupplyAmt())
@@ -272,13 +272,12 @@ public class AppOrderCreateService {
                         .currentStockQty(itemReq.getCurrentStockQty())
                         .orderQty(itemReq.getOrderQty())
                         .taxTarget(itemReq.getTaxTarget())
-                        .warehouseName(null) // warehouse 테이블에서 조인 필요
                         .taxableAmt(itemReq.getTaxableAmt())
                         .taxFreeAmt(itemReq.getTaxFreeAmt())
                         .supplyAmt(itemReq.getSupplyAmt())
                         .vatAmt(itemReq.getVatAmt())
-                        .totalAmt(itemReq.getTotalAmt()) // 프론트에서 계산된 값
-                        .totalQty(itemReq.getTotalQty()) // 프론트에서 계산된 값
+                        .totalAmt(itemReq.getTotalAmt())
+                        .totalQty(itemReq.getTotalQty())
                         .build();
                 
                 orderItemRepository.save(orderItem);

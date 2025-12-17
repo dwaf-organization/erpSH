@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,18 +26,25 @@ public class AppOrderService {
      */
     @Transactional(readOnly = true)
     public RespDto<List<AppOrderItemListRespDto>> findOrderableItemsForApp(
-            Integer customerCode, 
+            Integer customerCode,
             Integer customerUserCode,
-            String itemType, 
-            String categoryCode, 
+            String itemType,
+            String categoryCode,
             String itemName) {
         try {
             List<Object[]> itemResults;
+
+            // 위시리스트 정보 조회 (itemCode, customerWishlistCode)
+            List<Object[]> wishlistResults = customerWishlistRepository
+                    .findItemCodesAndWishlistCodesByCustomerCodeAndCustomerUserCode(customerCode, customerUserCode);
             
-            // 위시리스트 품목코드 목록 조회
-            List<Integer> wishlistItemCodes = customerWishlistRepository
-                    .findItemCodesByCustomerCodeAndCustomerUserCode(customerCode, customerUserCode);
-            
+            // Map으로 변환 (itemCode -> customerWishlistCode)
+            Map<Integer, Integer> wishlistMap = wishlistResults.stream()
+                    .collect(Collectors.toMap(
+                            result -> (Integer) result[0],  // itemCode
+                            result -> (Integer) result[1]   // customerWishlistCode
+                    ));
+
             // itemType에 따라 다른 쿼리 호출
             if ("위시리스트".equals(itemType)) {
                 // 위시리스트 품목만 조회
@@ -47,12 +55,13 @@ public class AppOrderService {
                 itemResults = itemRepository.findAllOrderableItemsForApp(
                         customerCode, categoryCode, itemName);
             }
-            
-            // Object[] 결과를 DTO로 변환 (warehouse_code 포함)
+
+            // Object[] 결과를 DTO로 변환
             List<AppOrderItemListRespDto> responseList = itemResults.stream()
                 .map(result -> {
                     Integer itemCode = (Integer) result[0];
-                    
+                    Integer customerWishlistCode = wishlistMap.get(itemCode);  // ✅ wishlistMap에서 조회
+
                     return AppOrderItemListRespDto.builder()
                             .itemCode(itemCode)
                             .itemName((String) result[1])
@@ -63,20 +72,21 @@ public class AppOrderService {
                             .categoryCode((Integer) result[6])
                             .origin((String) result[7])
                             .priceType((Integer) result[8])
-                            .customerPrice((Integer) result[9])     // base_price
-                            .supplyPrice((Integer) result[10])      // supply_price  
-                            .taxAmount((Integer) result[11])        // tax_amount
-                            .taxableAmount((Integer) result[12])    // taxable_amount
-                            .dutyFreeAmount((Integer) result[13])   // duty_free_amount
-                            .totalAmt((Integer) result[14])         // total_amt
+                            .customerPrice((Integer) result[9])
+                            .supplyPrice((Integer) result[10])
+                            .taxAmount((Integer) result[11])
+                            .taxableAmount((Integer) result[12])
+                            .dutyFreeAmount((Integer) result[13])
+                            .totalAmt((Integer) result[14])
                             .orderAvailableYn((Integer) result[15])
                             .minOrderQty((Integer) result[16])
                             .maxOrderQty((Integer) result[17])
                             .deadlineDay((Integer) result[18])
                             .deadlineTime((String) result[19])
                             .currentQuantity((Integer) result[20])
-                            .warehouseCode((Integer) result[21])    // 새로 추가된 warehouse_code
-                            .isWishlist(wishlistItemCodes.contains(itemCode))
+                            .warehouseCode((Integer) result[21])
+                            .isWishlist(customerWishlistCode != null)               // ✅ null 체크로 판단
+                            .customerWishlistCode(customerWishlistCode)             // ✅ 위시리스트코드 설정
                             .build();
                 })
                 .collect(Collectors.toList());

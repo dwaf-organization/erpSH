@@ -29,12 +29,12 @@ public interface CustomerWishlistRepository extends JpaRepository<CustomerWishli
     );
 
     /**
-     * [앱전용] 위시리스트 품목코드 목록 조회
+     * [앱전용] 위시리스트 품목코드와 위시리스트코드 함께 조회
      */
-    @Query("SELECT cw.itemCode FROM CustomerWishlist cw " +
+    @Query("SELECT cw.itemCode, cw.customerWishlistCode FROM CustomerWishlist cw " +
            "WHERE cw.customerCode = :customerCode " +
            "AND cw.customerUserCode = :customerUserCode")
-    List<Integer> findItemCodesByCustomerCodeAndCustomerUserCode(
+    List<Object[]> findItemCodesAndWishlistCodesByCustomerCodeAndCustomerUserCode(
         @Param("customerCode") Integer customerCode,
         @Param("customerUserCode") Integer customerUserCode
     );

@@ -332,6 +332,7 @@ public class AdminHeadquarterService {
                     .userPw(passwordEncoder.encode(adminPassword))
                     .phone1("000-0000-0000")
                     .email("admin@" + request.getCompanyName().toLowerCase() + ".com")
+                    .ledgerUsageYn(1)
                     .description("본사등록시 자동 생성된 관리자")
                     .build();
             

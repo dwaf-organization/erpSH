@@ -28,5 +28,6 @@ public class UserSaveReqDto {
         private Integer roleCode;       // 사용자권한코드
         private String resignationDt;   // 퇴사일자 (YYYYMMDD)
         private String userPw;          // 암호
+        private Integer ledgerUsageYn;  // 장부대장 사용여부 (0=사용불가, 1=사용가능)
     }
 }

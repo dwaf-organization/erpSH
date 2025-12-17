@@ -60,7 +60,8 @@ public class UserService {
                             .resignationDt(formatResignationDate((String) result[5]))
                             .roleCode((Integer) result[6])
                             .roleName((String) result[7])
-                            .userPw((String) result[8]) // 조회 시에도 표시
+                            .userPw((String) result[8])
+                            .ledgerUsageYn((Integer) result[9])
                             .build())
                     .collect(Collectors.toList());
             
@@ -225,6 +226,9 @@ public class UserService {
             user.setRoleCode(saveDto.getRoleCode());
             user.setResignationDt(saveDto.getResignationDt());
             
+            // 장부대장 사용여부 업데이트 (받은 값 사용, null이면 기본값 0)
+            user.setLedgerUsageYn(saveDto.getLedgerUsageYn() != null ? saveDto.getLedgerUsageYn() : 0);
+            
             // 비밀번호가 제공된 경우에만 암호화하여 업데이트
             if (saveDto.getUserPw() != null && !saveDto.getUserPw().isEmpty()) {
                 user.setUserPw(passwordEncoder.encode(saveDto.getUserPw()));
@@ -250,6 +254,7 @@ public class UserService {
                     .phone2(saveDto.getPhone2())
                     .email(saveDto.getEmail())
                     .resignationDt(null) // 신규 생성 시 null
+                    .ledgerUsageYn(saveDto.getLedgerUsageYn() != null ? saveDto.getLedgerUsageYn() : 0)
                     .description("사용자등록")
                     .build();
         }
@@ -345,6 +350,33 @@ public class UserService {
         } catch (Exception e) {
             log.warn("퇴사일자 포맷 변환 실패: {}", resignationDt);
             return resignationDt;
+        }
+    }
+    
+    /**
+     * 장부대장 사용여부 조회
+     */
+    @Transactional(readOnly = true)
+    public RespDto<Integer> getLedgerUsage(Integer hqCode, String userCode) {
+        try {
+            log.info("장부대장 사용여부 조회 시작 - hqCode: {}, userCode: {}", hqCode, userCode);
+            
+            // 본사코드와 사번으로 사용자 조회
+            User user = userRepository.findByHqCodeAndUserCode(hqCode, userCode);
+            if (user == null) {
+                return RespDto.fail("해당 사용자를 찾을 수 없습니다.");
+            }
+            
+            Integer ledgerUsageYn = user.getLedgerUsageYn();
+            
+            log.info("장부대장 사용여부 조회 완료 - hqCode: {}, userCode: {}, ledgerUsageYn: {}", 
+                    hqCode, userCode, ledgerUsageYn);
+            
+            return RespDto.success("장부대장 사용여부 조회 성공", ledgerUsageYn);
+            
+        } catch (Exception e) {
+            log.error("장부대장 사용여부 조회 중 오류 발생 - hqCode: {}, userCode: {}", hqCode, userCode, e);
+            return RespDto.fail("장부대장 사용여부 조회 중 오류가 발생했습니다.");
         }
     }
 }

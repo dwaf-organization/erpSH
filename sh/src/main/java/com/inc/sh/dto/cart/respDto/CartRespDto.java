@@ -24,6 +24,11 @@ public class CartRespDto {
     private String unit;
     private Integer priceType;
     private Integer orderUnitPrice;
+    private Integer supplyPrice;        // 공급가액
+    private Integer taxAmount;          // 부가세액
+    private Integer taxableAmount;      // 과세액(과세 공급가액)
+    private Integer dutyFreeAmount;     // 면세액
+    private Integer totalAmount;        // 총액
     private Integer currentStockQty;
     private Integer orderQty;
     private String taxTarget;

@@ -18,4 +18,5 @@ public class UserRespDto {
     private Integer roleCode;       // 사용자권한코드
     private String roleName;        // 사용자권한명
     private String userPw;          // 비밀번호 (조회 시 표시용)
+    private Integer ledgerUsageYn;  // 장부대장사용여부(1=가능, 0=불가능)
 }
