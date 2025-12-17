@@ -22,6 +22,7 @@ public class OrderRespDto {
     private Integer depositTypeCode;
     private String deliveryStatus;
     private Integer deliveryAmt;
+    private String deliveryDt;
     private Integer distCenterCode;
     private String distCenterName;
     private Integer vehicleCode;
@@ -104,6 +105,7 @@ public class OrderRespDto {
                 .depositTypeCode(order.getDepositTypeCode())
                 .deliveryStatus(order.getDeliveryStatus())
                 .deliveryAmt(order.getDeliveryAmt())
+                .deliveryDt(order.getDeliveryDt())
                 .distCenterName(order.getDistCenterName())
                 .orderMessage(order.getOrderMessage())
                 .taxableAmt(order.getTaxableAmt())
