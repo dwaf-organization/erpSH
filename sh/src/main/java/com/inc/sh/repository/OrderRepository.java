@@ -802,7 +802,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
            "WHERE o.customer_code = :customerCode " +
            "ORDER BY o.order_dt DESC " +
            "LIMIT 1", nativeQuery = true)
-    Object[] findRecentOrderByCustomerCode(@Param("customerCode") Integer customerCode);
+    List<Object[]> findRecentOrderByCustomerCode(@Param("customerCode") Integer customerCode);
     
     /**
      * 거래처별 납기요청일 범위의 주문내역 조회 (페이징)

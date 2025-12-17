@@ -5,6 +5,8 @@ import com.inc.sh.dto.order.reqDto.OrderCreateReqDto;
 import com.inc.sh.dto.order.respDto.AppOrderRespDto;
 import com.inc.sh.entity.*;
 import com.inc.sh.repository.*;
+import com.inc.sh.service.NotificationService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class AppOrderCreateService {
     private final CustomerAccountTransactionsRepository customerAccountTransactionsRepository;
     private final DeliveryHolidayRepository deliveryHolidayRepository;
     private final OrderLimitSetRepository orderLimitSetRepository;
+    private final NotificationService notificationService;
     
     /**
      * 주문 생성
@@ -289,6 +292,17 @@ public class AppOrderCreateService {
                     .totalAmt(request.getTotalAmt())
                     .message("주문이 완료되었습니다")
                     .build();
+            
+            try {
+                notificationService.createOrderNotification(
+                    customer.getHqCode(),
+                    customer.getCustomerCode(),
+                    customer.getCustomerName(),
+                    orderNo
+                );
+            } catch (Exception e) {
+                log.warn("주문 알림 생성 실패 - orderNo: {}", orderNo, e);
+            }
             
             return RespDto.success("주문 생성 성공", responseData);
             

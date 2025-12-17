@@ -63,7 +63,7 @@ public class HqController {
      */
     @GetMapping("/main")
     public ResponseEntity<RespDto<AppMainRespDto>> getMainInfo(
-            @RequestParam("customer_code") Integer customerCode) {
+            @RequestParam("customerCode") Integer customerCode) {
         
         log.info("[앱] 메인페이지 정보 조회 요청 - customerCode: {}", customerCode);
         

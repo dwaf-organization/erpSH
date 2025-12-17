@@ -170,14 +170,16 @@ public class AppCustomerService {
             }
             
             // 최근 주문 정보 조회 (order_dt 기준 최근 1건)
-            Object[] recentOrder = orderRepository.findRecentOrderByCustomerCode(customerCode);
+            List<Object[]> recentOrders = orderRepository.findRecentOrderByCustomerCode(customerCode);
             String recentOrderNo = null;
             Integer recentOrderAmt = null;
-            if (recentOrder != null && recentOrder.length >= 2) {
-                recentOrderNo = (String) recentOrder[0];
-                recentOrderAmt = (Integer) recentOrder[1];
+            if (!recentOrders.isEmpty()) {
+                Object[] recentOrder = recentOrders.get(0); // 첫 번째 결과
+                if (recentOrder.length >= 2) {
+                    recentOrderNo = (String) recentOrder[0];
+                    recentOrderAmt = (Integer) recentOrder[1];
+                }
             }
-            
             // 최근 반품 요청 금액 조회 (return_request_dt 기준 최근 1건)
             Integer recentReturnAmt = returnRepository.findRecentReturnAmountByCustomerCode(customerCode);
             

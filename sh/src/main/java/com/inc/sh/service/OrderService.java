@@ -30,11 +30,11 @@ public class OrderService {
     private final CustomerAccountTransactionsRepository customerAccountTransactionsRepository;
     private final DeliveryHolidayRepository deliveryHolidayRepository;
     private final OrderLimitSetRepository orderLimitSetRepository;
-    private final VehicleRepository vehicleRepository;
     private final WarehouseItemsRepository warehouseItemsRepository;
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
-
+    private final NotificationService notificationService;
+    
     /**
      * 주문 목록 조회
      */
@@ -224,6 +224,18 @@ public class OrderService {
             orderEntity = orderRepository.save(orderEntity);
             
             log.info("주문 신규 생성 - orderNo: {}, customerName: {}", orderNo, customer.getCustomerName());
+            
+         // 주문 알림 생성 추가
+            try {
+                notificationService.createOrderNotification(
+                    orderEntity.getHqCode(),
+                    orderEntity.getCustomerCode(),
+                    customer.getCustomerName(),
+                    orderNo
+                );
+            } catch (Exception e) {
+                log.warn("주문 알림 생성 실패 - orderNo: {}", orderNo, e);
+            }
             
         } else {
             // 주문 수정
