@@ -12,6 +12,5 @@ import java.util.List;
 public class InventorySaveDto {
     
     private String closingYm;                    // 마감년월
-    private Integer warehouseCode;               // 창고코드
     private List<InventoryItemDto> items;        // 품목 리스트
 }

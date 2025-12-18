@@ -11,6 +11,7 @@ public class InventoryItemDto {
     
     private Integer warehouseItemCode; // 창고품목코드 (기존 데이터일 경우)
     private Integer itemCode;          // 품목코드
+    private Integer warehouseCode;      //창고코드 추가
     private Integer actualQuantity;    // 실사수량
     private Integer actualUnitPrice;   // 실사단가
     private Integer actualAmount;      // 실사금액

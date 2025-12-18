@@ -1,5 +1,6 @@
 package com.inc.sh.service;
 
+import com.inc.sh.dto.returnManagement.reqDto.ReturnApprovalDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnDeleteReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSaveReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSearchDto;
@@ -8,16 +9,22 @@ import com.inc.sh.dto.returnManagement.respDto.ReturnBatchResult;
 import com.inc.sh.dto.returnManagement.respDto.ReturnRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.entity.Customer;
+import com.inc.sh.entity.InventoryTransactions;
 import com.inc.sh.entity.Item;
+import com.inc.sh.entity.MonthlyInventoryClosing;
 import com.inc.sh.entity.Order;
 import com.inc.sh.entity.OrderItem;
 import com.inc.sh.entity.Return;
 import com.inc.sh.entity.Warehouse;
+import com.inc.sh.entity.WarehouseItems;
 import com.inc.sh.repository.CustomerRepository;
+import com.inc.sh.repository.InventoryTransactionsRepository;
 import com.inc.sh.repository.ItemRepository;
+import com.inc.sh.repository.MonthlyInventoryClosingRepository;
 import com.inc.sh.repository.OrderItemRepository;
 import com.inc.sh.repository.OrderRepository;
 import com.inc.sh.repository.ReturnRepository;
+import com.inc.sh.repository.WarehouseItemsRepository;
 import com.inc.sh.repository.WarehouseRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +38,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +52,9 @@ public class ReturnManagementService {
     private final OrderItemRepository orderItemRepository;
     private final OrderRepository orderRepository;
     private final WarehouseRepository warehouseRepository;
+    private final WarehouseItemsRepository warehouseItemsRepository;
+    private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
+    private final InventoryTransactionsRepository inventoryTransactionsRepository;
     
     /**
      * 반품 조회
@@ -426,5 +437,276 @@ public class ReturnManagementService {
         }
 
         return String.format("%s%03d", datePrefix, sequence);
+    }
+    
+    /**
+     * 반품 승인/미승인 처리 (✅ 재고처리 포함)
+     */
+    @Transactional
+    public RespDto<ReturnBatchResult> processReturnApproval(ReturnApprovalDto approvalDto) {
+        try {
+            log.info("반품 승인/미승인 처리 시작 - 액션: {}, 대상: {}건", 
+                    approvalDto.getApprovalAction(), approvalDto.getReturnNos().size());
+            
+            List<ReturnRespDto> successList = new ArrayList<>();
+            List<ReturnBatchResult.ReturnErrorDto> failureList = new ArrayList<>();
+            
+            String currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String currentYm = currentDate.substring(0, 6); // YYYYMM
+            
+            for (String returnNo : approvalDto.getReturnNos()) {
+                try {
+                    Return returnEntity = returnRepository.findByReturnNo(returnNo);
+                    if (returnEntity == null) {
+                        failureList.add(ReturnBatchResult.ReturnErrorDto.builder()
+                                .returnNo(returnNo)
+                                .customerName("알 수 없음")
+                                .itemName("알 수 없음")
+                                .errorMessage("존재하지 않는 반품입니다")
+                                .build());
+                        continue;
+                    }
+                    
+                    // 현재 상태와 요청 액션이 같으면 스킵
+                    if (approvalDto.getApprovalAction().equals(returnEntity.getProgressStatus())) {
+                        failureList.add(ReturnBatchResult.ReturnErrorDto.builder()
+                                .returnNo(returnNo)
+                                .customerName(returnEntity.getReturnCustomerName())
+                                .itemName(returnEntity.getItemName())
+                                .errorMessage("이미 " + approvalDto.getApprovalAction() + " 상태입니다")
+                                .build());
+                        continue;
+                    }
+                    
+                    // ✅ 승인처리시 재고 업데이트
+                    if ("승인".equals(approvalDto.getApprovalAction())) {
+                        processReturnApprovalInventory(returnEntity, currentDate, currentYm);
+                    }
+                    
+                    // ✅ 미승인으로 되돌릴 때 재고 롤백
+                    if ("미승인".equals(approvalDto.getApprovalAction()) && "승인".equals(returnEntity.getProgressStatus())) {
+                        rollbackReturnApprovalInventory(returnEntity, currentDate, currentYm);
+                    }
+                    
+                    // 반품 상태 업데이트
+                    returnEntity.setProgressStatus(approvalDto.getApprovalAction());
+                    if ("승인".equals(approvalDto.getApprovalAction())) {
+                        returnEntity.setReturnApproveDt(currentDate);
+                    } else {
+                        returnEntity.setReturnApproveDt(null); // 미승인시 승인일자 초기화
+                    }
+                    
+                    // 승인사유 업데이트 (선택사항)
+                    if (approvalDto.getApprovalNote() != null) {
+                        returnEntity.setNote(approvalDto.getApprovalNote());
+                    }
+                    
+                    returnEntity = returnRepository.save(returnEntity);
+                    
+                    // 성공 데이터 생성
+                    ReturnRespDto successData = ReturnRespDto.builder()
+                            .returnNo(returnEntity.getReturnNo())
+                            .orderNo(returnEntity.getOrderNo())
+                            .customerCode(returnEntity.getReturnCustomerCode())
+                            .customerName(returnEntity.getReturnCustomerName())
+                            .itemCode(returnEntity.getItemCode())
+                            .itemName(returnEntity.getItemName())
+                            .quantity(returnEntity.getQty())
+                            .status(returnEntity.getProgressStatus())
+                            .returnApprovalDate(returnEntity.getReturnApproveDt())
+                            .build();
+                    
+                    successList.add(successData);
+                    
+                    log.info("반품 {}처리 완료 - returnNo: {}, customerName: {}", 
+                            approvalDto.getApprovalAction(), returnNo, returnEntity.getReturnCustomerName());
+                    
+                } catch (Exception e) {
+                    log.error("반품 {}처리 중 오류 발생 - returnNo: {}", approvalDto.getApprovalAction(), returnNo, e);
+                    
+                    // 에러 정보 안전 조회
+                    ReturnBatchResult.ReturnErrorDto errorInfo = getReturnErrorInfoSafely(returnNo, e.getMessage());
+                    failureList.add(errorInfo);
+                }
+            }
+            
+            // 배치 결과 생성
+            ReturnBatchResult batchResult = ReturnBatchResult.builder()
+                    .totalCount(approvalDto.getReturnNos().size())
+                    .successCount(successList.size())
+                    .failCount(failureList.size())
+                    .successData(successList)
+                    .failData(failureList)
+                    .build();
+            
+            String message = String.format("반품 %s처리 완료 - 성공: %d건, 실패: %d건", 
+                    approvalDto.getApprovalAction(), batchResult.getSuccessCount(), batchResult.getFailCount());
+            
+            log.info("반품 승인/미승인 배치 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailCount());
+            
+            return RespDto.success(message, batchResult);
+            
+        } catch (Exception e) {
+            log.error("반품 승인/미승인 처리 중 오류 발생", e);
+            return RespDto.fail("반품 승인/미승인 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 반품승인시 재고 처리 (창고재고 증가 + 월별재고마감 입고량 증가)
+     */
+    private void processReturnApprovalInventory(Return returnEntity, String currentDate, String currentYm) {
+        
+        // 1. 창고재고 증가
+        Optional<WarehouseItems> warehouseItemOpt = warehouseItemsRepository
+                .findByWarehouseCodeAndItemCode(returnEntity.getReceiveWarehouseCode(), returnEntity.getItemCode());
+        
+        if (warehouseItemOpt.isPresent()) {
+            WarehouseItems warehouseItem = warehouseItemOpt.get();
+            
+            // 창고재고 증가 (반품입고)
+            warehouseItem.setCurrentQuantity(warehouseItem.getCurrentQuantity() + returnEntity.getQty());
+            warehouseItemsRepository.save(warehouseItem);
+            
+            // 2. 재고수불부 기록 추가
+            createReturnInventoryTransaction(warehouseItem, returnEntity, currentDate, "반품입고");
+            
+            // 3. 월별재고마감 업데이트 (입고량 증가)
+            updateMonthlyInventoryForReturn(returnEntity.getReceiveWarehouseCode(), 
+                    returnEntity.getItemCode(), returnEntity.getQty(), 
+                    returnEntity.getQty() * returnEntity.getUnitPrice(), currentYm);
+            
+            log.info("반품승인 재고처리 완료 - 품목코드: {}, 입고수량: {}, 창고코드: {}", 
+                    returnEntity.getItemCode(), returnEntity.getQty(), returnEntity.getReceiveWarehouseCode());
+            
+        } else {
+            throw new RuntimeException(String.format(
+                "창고품목을 찾을 수 없습니다. 창고코드: %d, 품목코드: %d", 
+                returnEntity.getReceiveWarehouseCode(), returnEntity.getItemCode()));
+        }
+    }
+    
+    /**
+     * 반품승인 롤백시 재고 처리 (창고재고 감소 + 월별재고마감 입고량 감소)
+     */
+    private void rollbackReturnApprovalInventory(Return returnEntity, String currentDate, String currentYm) {
+        
+        // 1. 창고재고 감소
+        Optional<WarehouseItems> warehouseItemOpt = warehouseItemsRepository
+                .findByWarehouseCodeAndItemCode(returnEntity.getReceiveWarehouseCode(), returnEntity.getItemCode());
+        
+        if (warehouseItemOpt.isPresent()) {
+            WarehouseItems warehouseItem = warehouseItemOpt.get();
+            
+            // 재고 부족 체크
+            if (warehouseItem.getCurrentQuantity() < returnEntity.getQty()) {
+                throw new RuntimeException(String.format(
+                    "재고 부족으로 반품승인을 취소할 수 없습니다. 현재고: %d, 반품수량: %d", 
+                    warehouseItem.getCurrentQuantity(), returnEntity.getQty()));
+            }
+            
+            // 창고재고 감소
+            warehouseItem.setCurrentQuantity(warehouseItem.getCurrentQuantity() - returnEntity.getQty());
+            warehouseItemsRepository.save(warehouseItem);
+            
+            // 2. 재고수불부 기록 추가
+            createReturnInventoryTransaction(warehouseItem, returnEntity, currentDate, "반품승인취소");
+            
+            // 3. 월별재고마감 업데이트 (입고량 감소)
+            updateMonthlyInventoryForReturn(returnEntity.getReceiveWarehouseCode(), 
+                    returnEntity.getItemCode(), -returnEntity.getQty(), 
+                    -(returnEntity.getQty() * returnEntity.getUnitPrice()), currentYm);
+            
+            log.info("반품승인 롤백 재고처리 완료 - 품목코드: {}, 감소수량: {}, 창고코드: {}", 
+                    returnEntity.getItemCode(), returnEntity.getQty(), returnEntity.getReceiveWarehouseCode());
+            
+        } else {
+            throw new RuntimeException(String.format(
+                "창고품목을 찾을 수 없습니다. 창고코드: %d, 품목코드: %d", 
+                returnEntity.getReceiveWarehouseCode(), returnEntity.getItemCode()));
+        }
+    }
+    
+    /**
+     * 반품용 재고수불부 기록 생성
+     */
+    private void createReturnInventoryTransaction(WarehouseItems warehouseItem, Return returnEntity, 
+                                                String currentDate, String transactionType) {
+        InventoryTransactions transaction = InventoryTransactions.builder()
+                .warehouseCode(warehouseItem.getWarehouseCode())
+                .warehouseItemCode(warehouseItem.getWarehouseItemCode())
+                .itemCode(warehouseItem.getItemCode())
+                .transactionDate(currentDate)
+                .transactionType(transactionType)
+                .quantity(returnEntity.getQty())
+                .unitPrice(returnEntity.getUnitPrice())
+                .amount(returnEntity.getQty() * returnEntity.getUnitPrice())
+                .description("반품번호: " + returnEntity.getReturnNo())
+                .build();
+        
+        inventoryTransactionsRepository.save(transaction);
+    }
+    
+    /**
+     * 반품용 월별재고마감 업데이트
+     */
+    private void updateMonthlyInventoryForReturn(Integer warehouseCode, Integer itemCode, 
+                                               Integer inQuantityChange, Integer inAmountChange, String closingYm) {
+        
+        Optional<MonthlyInventoryClosing> closingOpt = monthlyInventoryClosingRepository
+                .findByWarehouseCodeAndItemCodeAndClosingYm(warehouseCode, itemCode, closingYm);
+        
+        if (closingOpt.isPresent()) {
+            MonthlyInventoryClosing closing = closingOpt.get();
+            
+            // ✅ 입고량/입고금액 업데이트 (반품은 입고로 처리)
+            closing.setInQuantity(closing.getInQuantity() + inQuantityChange);
+            closing.setInAmount(closing.getInAmount() + inAmountChange);
+            
+            // 계산수량/계산금액 재계산 (이월+입고-출고)
+            Integer calQuantity = closing.getOpeningQuantity() + closing.getInQuantity() - closing.getOutQuantity();
+            Integer calAmount = closing.getOpeningAmount() + closing.getInAmount() - closing.getOutAmount();
+            
+            closing.setCalQuantity(calQuantity);
+            closing.setCalAmount(calAmount);
+            
+            monthlyInventoryClosingRepository.save(closing);
+            
+            log.info("반품 월별재고마감 업데이트 완료 - 창고코드: {}, 품목코드: {}, 입고량 변화: {}", 
+                    warehouseCode, itemCode, inQuantityChange);
+            
+        } else {
+            // 월별재고마감 데이터가 없으면 에러
+            throw new RuntimeException(String.format(
+                "반품처리를 위한 월별재고마감 데이터가 없습니다. 창고코드: %d, 품목코드: %d, 마감년월: %s (재고등록이 필요합니다)", 
+                warehouseCode, itemCode, closingYm));
+        }
+    }
+    
+    /**
+     * 에러 정보 안전 조회
+     */
+    private ReturnBatchResult.ReturnErrorDto getReturnErrorInfoSafely(String returnNo, String errorMessage) {
+        try {
+            Return returnEntity = returnRepository.findByReturnNo(returnNo);
+            if (returnEntity != null) {
+                return ReturnBatchResult.ReturnErrorDto.builder()
+                        .returnNo(returnNo)
+                        .customerName(returnEntity.getReturnCustomerName())
+                        .itemName(returnEntity.getItemName())
+                        .errorMessage(errorMessage)
+                        .build();
+            }
+        } catch (Exception e) {
+            log.warn("에러 정보 조회 실패 - returnNo: {}", returnNo, e);
+        }
+        
+        return ReturnBatchResult.ReturnErrorDto.builder()
+                .returnNo(returnNo)
+                .customerName("알 수 없음")
+                .itemName("알 수 없음")
+                .errorMessage(errorMessage)
+                .build();
     }
 }

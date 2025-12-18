@@ -2,6 +2,7 @@ package com.inc.sh.controller;
 
 import com.inc.sh.dto.inventory.reqDto.InventorySearchDto;
 import com.inc.sh.dto.inventory.reqDto.InventoryDeleteReqDto;
+import com.inc.sh.dto.inventory.reqDto.InventoryItemDto;
 import com.inc.sh.dto.inventory.reqDto.InventorySaveDto;
 import com.inc.sh.dto.inventory.respDto.InventoryBatchResult;
 import com.inc.sh.dto.inventory.respDto.InventoryRespDto;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -58,9 +60,19 @@ public class InventoryController {
     @PostMapping("/save")
     public ResponseEntity<RespDto<String>> saveInventory(@RequestBody InventorySaveDto saveDto) {
         
-        log.info("재고등록 저장 요청 - 창고코드: {}, 마감년월: {}, 품목수: {}", 
-                saveDto.getWarehouseCode(), saveDto.getClosingYm(), 
+        log.info("재고등록 저장 요청 - 마감년월: {}, 품목수: {}", 
+                saveDto.getClosingYm(), 
                 saveDto.getItems() != null ? saveDto.getItems().size() : 0);
+        
+        // ✅ 창고코드별로 그룹핑해서 로그 출력 (선택사항)
+        if (saveDto.getItems() != null && !saveDto.getItems().isEmpty()) {
+            Map<Integer, Long> warehouseGroups = saveDto.getItems().stream()
+                    .collect(Collectors.groupingBy(
+                        InventoryItemDto::getWarehouseCode, 
+                        Collectors.counting()));
+            
+            log.info("창고별 품목 분포: {}", warehouseGroups);
+        }
         
         RespDto<String> response = inventoryService.saveInventory(saveDto);
         

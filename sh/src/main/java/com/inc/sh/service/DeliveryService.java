@@ -1,6 +1,7 @@
 package com.inc.sh.service;
 
 import com.inc.sh.dto.delivery.reqDto.*;
+import com.inc.sh.dto.delivery.respDto.DeliveryBatchResult;
 import com.inc.sh.dto.order.respDto.*;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.entity.*;
@@ -27,6 +28,8 @@ public class DeliveryService {
     private final WarehouseItemsRepository warehouseItemsRepository;
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final ItemRepository itemRepository;
     
     /**
      * 배송 주문 목록 조회
@@ -86,28 +89,34 @@ public class DeliveryService {
      * 배송시작 (배송요청 → 배송중) + 재고 차감
      */
     @Transactional
-    public RespDto<List<String>> startDelivery(DeliveryStartDto startDto) {
+    public RespDto<DeliveryBatchResult> startDelivery(DeliveryStartDto startDto) {
         try {
             log.info("배송시작 처리 시작 - 주문수: {}", startDto.getOrders().size());
             
-            List<String> successOrders = new ArrayList<>();
-            List<String> failedOrders = new ArrayList<>();
+            List<DeliveryBatchResult.DeliverySuccessResult> successList = new ArrayList<>();
+            List<DeliveryBatchResult.DeliveryFailureResult> failureList = new ArrayList<>();
             
             for (DeliveryStartDto.DeliveryOrderDto orderDto : startDto.getOrders()) {
                 try {
                     Order order = orderRepository.findByOrderNo(orderDto.getOrderNo());
                     if (order == null) {
-                        failedOrders.add(orderDto.getOrderNo() + " (존재하지 않는 주문)");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderDto.getOrderNo())
+                                .reason("존재하지 않는 주문입니다")
+                                .build());
                         continue;
                     }
                     
                     // 배송요청 상태 확인
                     if (!"배송요청".equals(order.getDeliveryStatus())) {
-                        failedOrders.add(orderDto.getOrderNo() + " (배송요청 상태가 아님: " + order.getDeliveryStatus() + ")");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderDto.getOrderNo())
+                                .reason("배송요청 상태가 아닙니다. 현재상태: " + order.getDeliveryStatus())
+                                .build());
                         continue;
                     }
                     
-                    // ✅ 재고 차감 처리 (주문품목별로)
+                    // 재고 차감 처리 (주문품목별로)
                     List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderDto.getOrderNo());
                     for (OrderItem item : orderItems) {
                         processInventoryDeduction(item);
@@ -121,25 +130,41 @@ public class DeliveryService {
                     order.setDeliveryStatus("배송중");
                     
                     orderRepository.save(order);
-                    successOrders.add(orderDto.getOrderNo());
+                    
+                    successList.add(DeliveryBatchResult.DeliverySuccessResult.builder()
+                            .orderNo(orderDto.getOrderNo())
+                            .customerName(order.getCustomerName())
+                            .deliveryStatus("배송중")
+                            .message("배송시작 완료 (재고차감 포함)")
+                            .build());
                     
                     log.info("배송시작 처리 완료 (재고차감 포함) - orderNo: {}", orderDto.getOrderNo());
                     
                 } catch (Exception e) {
                     log.error("배송시작 처리 중 오류 발생 - orderNo: {}", orderDto.getOrderNo(), e);
-                    failedOrders.add(orderDto.getOrderNo() + " (처리 오류: " + e.getMessage() + ")");
+                    failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                            .orderNo(orderDto.getOrderNo())
+                            .reason("처리 중 오류 발생: " + e.getMessage())
+                            .build());
                 }
             }
             
+            // 배치 결과 생성
+            DeliveryBatchResult batchResult = DeliveryBatchResult.builder()
+                    .totalCount(startDto.getOrders().size())
+                    .successCount(successList.size())
+                    .failCount(failureList.size())
+                    .successData(successList)
+                    .failData(failureList)
+                    .build();
+            
             String message = String.format("배송시작 처리 완료 - 성공: %d건, 실패: %d건", 
-                    successOrders.size(), failedOrders.size());
+                    batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            if (!failedOrders.isEmpty()) {
-                message += " | 실패 주문: " + String.join(", ", failedOrders);
-            }
+            log.info("배송시작 배치 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            log.info(message);
-            return RespDto.success(message, successOrders);
+            return RespDto.success(message, batchResult);
             
         } catch (Exception e) {
             log.error("배송시작 처리 중 오류 발생", e);
@@ -151,28 +176,34 @@ public class DeliveryService {
      * 배송취소 (배송중 → 배송요청) + 재고 복원
      */
     @Transactional
-    public RespDto<List<String>> cancelDelivery(DeliveryCancelDto cancelDto) {
+    public RespDto<DeliveryBatchResult> cancelDelivery(DeliveryCancelDto cancelDto) {
         try {
             log.info("배송취소 처리 시작 - 주문수: {}", cancelDto.getOrderNos().size());
             
-            List<String> successOrders = new ArrayList<>();
-            List<String> failedOrders = new ArrayList<>();
+            List<DeliveryBatchResult.DeliverySuccessResult> successList = new ArrayList<>();
+            List<DeliveryBatchResult.DeliveryFailureResult> failureList = new ArrayList<>();
             
             for (String orderNo : cancelDto.getOrderNos()) {
                 try {
                     Order order = orderRepository.findByOrderNo(orderNo);
                     if (order == null) {
-                        failedOrders.add(orderNo + " (존재하지 않는 주문)");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderNo)
+                                .reason("존재하지 않는 주문입니다")
+                                .build());
                         continue;
                     }
                     
                     // 배송중 상태 확인
                     if (!"배송중".equals(order.getDeliveryStatus())) {
-                        failedOrders.add(orderNo + " (배송중 상태가 아님: " + order.getDeliveryStatus() + ")");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderNo)
+                                .reason("배송중 상태가 아닙니다. 현재상태: " + order.getDeliveryStatus())
+                                .build());
                         continue;
                     }
                     
-                    // ✅ 재고 복원 처리 (주문품목별로)
+                    // 재고 복원 처리 (주문품목별로)
                     List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderNo);
                     for (OrderItem item : orderItems) {
                         processInventoryRestoration(item);
@@ -183,25 +214,41 @@ public class DeliveryService {
                     order.setDeliveryDt(null); // 배송일자 초기화
                     
                     orderRepository.save(order);
-                    successOrders.add(orderNo);
+                    
+                    successList.add(DeliveryBatchResult.DeliverySuccessResult.builder()
+                            .orderNo(orderNo)
+                            .customerName(order.getCustomerName())
+                            .deliveryStatus("배송요청")
+                            .message("배송취소 완료 (재고복원 포함)")
+                            .build());
                     
                     log.info("배송취소 처리 완료 (재고복원 포함) - orderNo: {}", orderNo);
                     
                 } catch (Exception e) {
                     log.error("배송취소 처리 중 오류 발생 - orderNo: {}", orderNo, e);
-                    failedOrders.add(orderNo + " (처리 오류: " + e.getMessage() + ")");
+                    failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                            .orderNo(orderNo)
+                            .reason("처리 중 오류 발생: " + e.getMessage())
+                            .build());
                 }
             }
             
+            // 배치 결과 생성
+            DeliveryBatchResult batchResult = DeliveryBatchResult.builder()
+                    .totalCount(cancelDto.getOrderNos().size())
+                    .successCount(successList.size())
+                    .failCount(failureList.size())
+                    .successData(successList)
+                    .failData(failureList)
+                    .build();
+            
             String message = String.format("배송취소 처리 완료 - 성공: %d건, 실패: %d건", 
-                    successOrders.size(), failedOrders.size());
+                    batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            if (!failedOrders.isEmpty()) {
-                message += " | 실패 주문: " + String.join(", ", failedOrders);
-            }
+            log.info("배송취소 배치 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            log.info(message);
-            return RespDto.success(message, successOrders);
+            return RespDto.success(message, batchResult);
             
         } catch (Exception e) {
             log.error("배송취소 처리 중 오류 발생", e);
@@ -214,53 +261,77 @@ public class DeliveryService {
      * 재고처리 없음 (이미 배송시작에서 처리됨)
      */
     @Transactional
-    public RespDto<List<String>> completeDelivery(DeliveryCompleteDto completeDto) {
+    public RespDto<DeliveryBatchResult> completeDelivery(DeliveryCompleteDto completeDto) {
         try {
             log.info("배송완료 처리 시작 - 주문수: {}", completeDto.getOrderNos().size());
             
-            List<String> successOrders = new ArrayList<>();
-            List<String> failedOrders = new ArrayList<>();
+            List<DeliveryBatchResult.DeliverySuccessResult> successList = new ArrayList<>();
+            List<DeliveryBatchResult.DeliveryFailureResult> failureList = new ArrayList<>();
             
             for (String orderNo : completeDto.getOrderNos()) {
                 try {
                     Order order = orderRepository.findByOrderNo(orderNo);
                     if (order == null) {
-                        failedOrders.add(orderNo + " (존재하지 않는 주문)");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderNo)
+                                .reason("존재하지 않는 주문입니다")
+                                .build());
                         continue;
                     }
                     
-                    // 배송요청 또는 배송중 상태 확인
+                    // 배송 가능 상태 확인 (배송요청 또는 배송중만 배송완료로 변경 가능)
                     if (!"배송요청".equals(order.getDeliveryStatus()) && !"배송중".equals(order.getDeliveryStatus())) {
-                        failedOrders.add(orderNo + " (배송요청/배송중 상태가 아님: " + order.getDeliveryStatus() + ")");
+                        failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                                .orderNo(orderNo)
+                                .reason("배송완료로 변경할 수 없는 상태입니다. 현재상태: " + order.getDeliveryStatus())
+                                .build());
                         continue;
                     }
                     
-                    // 배송상태 변경 (재고처리 없음)
+                    // 배송상태 변경
                     order.setDeliveryStatus("배송완료");
+                    
+                    // 배송일자가 없으면 오늘 날짜로 설정
                     if (order.getDeliveryDt() == null) {
                         order.setDeliveryDt(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
                     }
                     
                     orderRepository.save(order);
-                    successOrders.add(orderNo);
+                    
+                    successList.add(DeliveryBatchResult.DeliverySuccessResult.builder()
+                            .orderNo(orderNo)
+                            .customerName(order.getCustomerName())
+                            .deliveryStatus("배송완료")
+                            .message("배송완료 처리 완료")
+                            .build());
                     
                     log.info("배송완료 처리 완료 - orderNo: {}", orderNo);
                     
                 } catch (Exception e) {
                     log.error("배송완료 처리 중 오류 발생 - orderNo: {}", orderNo, e);
-                    failedOrders.add(orderNo + " (처리 오류: " + e.getMessage() + ")");
+                    failureList.add(DeliveryBatchResult.DeliveryFailureResult.builder()
+                            .orderNo(orderNo)
+                            .reason("처리 중 오류 발생: " + e.getMessage())
+                            .build());
                 }
             }
             
+            // 배치 결과 생성
+            DeliveryBatchResult batchResult = DeliveryBatchResult.builder()
+                    .totalCount(completeDto.getOrderNos().size())
+                    .successCount(successList.size())
+                    .failCount(failureList.size())
+                    .successData(successList)
+                    .failData(failureList)
+                    .build();
+            
             String message = String.format("배송완료 처리 완료 - 성공: %d건, 실패: %d건", 
-                    successOrders.size(), failedOrders.size());
+                    batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            if (!failedOrders.isEmpty()) {
-                message += " | 실패 주문: " + String.join(", ", failedOrders);
-            }
+            log.info("배송완료 배치 처리 완료 - 총:{}건, 성공:{}건, 실패:{}건", 
+                    batchResult.getTotalCount(), batchResult.getSuccessCount(), batchResult.getFailCount());
             
-            log.info(message);
-            return RespDto.success(message, successOrders);
+            return RespDto.success(message, batchResult);
             
         } catch (Exception e) {
             log.error("배송완료 처리 중 오류 발생", e);
@@ -365,7 +436,7 @@ public class DeliveryService {
     }
     
     /**
-     * 월별재고마감 업데이트
+     * 월별재고마감 업데이트 (✅ 재고등록 안된 품목은 배송처리 불가)
      */
     private void updateMonthlyInventoryClosing(Integer warehouseCode, Integer itemCode, 
             Integer outQuantityChange, Integer outAmountChange) {
@@ -391,9 +462,43 @@ public class DeliveryService {
             
             monthlyInventoryClosingRepository.save(closing);
             
+            log.info("월별재고마감 업데이트 완료 - 창고코드: {}, 품목코드: {}, 출고량 변화: {}", 
+                    warehouseCode, itemCode, outQuantityChange);
+            
         } else {
-            log.warn("월별재고마감 데이터를 찾을 수 없습니다 - 창고코드: {}, 품목코드: {}, 마감년월: {}", 
-                    warehouseCode, itemCode, closingYm);
+            // ✅ 재고등록 안된 품목은 배송처리 불가
+            String warehouseName = getWarehouseNameSafely(warehouseCode);
+            String itemName = getItemNameSafely(itemCode);
+            
+            throw new RuntimeException(String.format(
+                "재고등록이 필요합니다. 품목명: %s, 창고: %s (품목코드: %d, 창고코드: %d, 마감년월: %s)", 
+                itemName, warehouseName, itemCode, warehouseCode, closingYm));
+        }
+    }
+    
+    /**
+     * 창고명 안전 조회
+     */
+    private String getWarehouseNameSafely(Integer warehouseCode) {
+        try {
+            return warehouseRepository.findById(warehouseCode)
+                    .map(warehouse -> warehouse.getWarehouseName())
+                    .orElse("알 수 없는 창고");
+        } catch (Exception e) {
+            return "창고코드: " + warehouseCode;
+        }
+    }
+    
+    /**
+     * 품목명 안전 조회
+     */
+    private String getItemNameSafely(Integer itemCode) {
+        try {
+            return itemRepository.findById(itemCode)
+                    .map(item -> item.getItemName())
+                    .orElse("알 수 없는 품목");
+        } catch (Exception e) {
+            return "품목코드: " + itemCode;
         }
     }
 }

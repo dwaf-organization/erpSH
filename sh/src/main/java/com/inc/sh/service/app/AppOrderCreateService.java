@@ -32,6 +32,7 @@ public class AppOrderCreateService {
     private final DeliveryHolidayRepository deliveryHolidayRepository;
     private final OrderLimitSetRepository orderLimitSetRepository;
     private final NotificationService notificationService;
+    private final DistCenterRepository distCenterRepository;
     
     /**
      * 주문 생성
@@ -43,6 +44,12 @@ public class AppOrderCreateService {
             Customer customer = customerRepository.findByCustomerCode(request.getCustomerCode());
             if (customer == null) {
                 return RespDto.fail("존재하지 않는 거래처입니다");
+            }
+            
+            // 물류센터 정보 조회
+            DistCenter distCenter = distCenterRepository.findByDistCenterCode(customer.getDistCenterCode());
+            if (distCenter == null) {
+                throw new RuntimeException("존재하지 않는 물류센터입니다: " + customer.getDistCenterCode());
             }
             
             // 2. 납기요청일 요일 체크
@@ -58,13 +65,13 @@ public class AppOrderCreateService {
             }
             
             // 4. 주문제한시간 체크
-//            RespDto<String> timeLimitCheck = checkOrderTimeLimit(customer.getBrandCode());
-//            if (timeLimitCheck.getCode() != 1) {
-//                return RespDto.fail(timeLimitCheck.getMessage());
-//            }
+            RespDto<String> timeLimitCheck = checkOrderTimeLimit(customer.getBrandCode());
+            if (timeLimitCheck.getCode() != 1) {
+                return RespDto.fail(timeLimitCheck.getMessage());
+            }
             
             // 5. 잔액 체크 및 주문 처리
-            RespDto<AppOrderRespDto> orderResult = processOrderByDepositType(request, customer);
+            RespDto<AppOrderRespDto> orderResult = processOrderByDepositType(request, customer, distCenter);
             if (orderResult.getCode() != 1) {
                 // 주문 실패시 장바구니 수량 복원
                 restoreCartQuantities(request);
@@ -182,10 +189,10 @@ public class AppOrderCreateService {
     /**
      * 입금유형별 주문 처리
      */
-    private RespDto<AppOrderRespDto> processOrderByDepositType(OrderCreateReqDto request, Customer customer) {
+    private RespDto<AppOrderRespDto> processOrderByDepositType(OrderCreateReqDto request, Customer customer, DistCenter distCenter) {
         if (customer.getDepositTypeCode() == 0) {
             // 후입금: 바로 주문 생성
-            return createOrderRecord(request, customer, "결제대기", "배송요청", null);
+            return createOrderRecord(request, customer, "결제대기", "배송요청", null, distCenter);
         } else {
             // 충전형: 잔액 체크
             if (customer.getBalanceAmt() < request.getTotalAmt()) {
@@ -198,7 +205,7 @@ public class AppOrderCreateService {
             
             // 주문 생성
             String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            RespDto<AppOrderRespDto> orderResult = createOrderRecord(request, customer, "결제완료", "배송요청", today);
+            RespDto<AppOrderRespDto> orderResult = createOrderRecord(request, customer, "결제완료", "배송요청", today, distCenter);
             
             if (orderResult.getCode() == 1) {
                 // 거래내역 추가
@@ -225,7 +232,7 @@ public class AppOrderCreateService {
      * 주문 레코드 생성
      */
     private RespDto<AppOrderRespDto> createOrderRecord(OrderCreateReqDto request, Customer customer, 
-                                                   String paymentStatus, String deliveryStatus, String paymentAt) {
+                                                   String paymentStatus, String deliveryStatus, String paymentAt, DistCenter distCenter) {
         try {
             // 주문번호 생성
             String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -239,6 +246,7 @@ public class AppOrderCreateService {
                     .customerCode(customer.getCustomerCode())
                     .vehicleCode(0) // 기본값
                     .distCenterCode(customer.getDistCenterCode())
+                    .distCenterName(distCenter.getDistCenterName())
                     .customerName(customer.getCustomerName())
                     .bizNum(customer.getBizNum())
                     .addr(customer.getAddr())

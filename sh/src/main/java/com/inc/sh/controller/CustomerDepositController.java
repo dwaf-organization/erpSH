@@ -32,17 +32,17 @@ public class CustomerDepositController {
             @RequestParam(value = "customerCode", required = false) Integer customerCode,
             @RequestParam("startDate") String startDate,
             @RequestParam("endDate") String endDate,
-            @RequestParam(value = "depositTypeCode", required = false) Integer depositTypeCode,
+            @RequestParam(value = "depositMethod", required = false) Integer depositMethod,
             @RequestParam("hqCode") Integer hqCode) {
         
         log.info("거래처수금처리 조회 요청 - 거래처: {}, 기간: {}~{}, 입금유형: {}, hqCode: {}", 
-                customerCode, startDate, endDate, depositTypeCode, hqCode);
+                customerCode, startDate, endDate, depositMethod, hqCode);
         
         CustomerDepositSearchDto searchDto = CustomerDepositSearchDto.builder()
                 .customerCode(customerCode)
                 .startDate(startDate)
                 .endDate(endDate)
-                .depositTypeCode(depositTypeCode)
+                .depositMethod(depositMethod)
                 .hqCode(hqCode)
                 .build();
         

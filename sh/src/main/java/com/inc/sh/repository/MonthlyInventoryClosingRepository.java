@@ -81,7 +81,7 @@ public interface MonthlyInventoryClosingRepository extends JpaRepository<Monthly
     void deleteByWarehouseItemCode(@Param("warehouseItemCode") Integer warehouseItemCode);
     
     /**
-     * 재고실사 조회 (월별재고마감 + 품목정보 + 최근거래유형)
+     * 재고실사 조회 (월별재고마감 + 품목정보 + 최근거래유형 + ✅안전재고)
      */
     @Query(value = "SELECT " +
            "mic.closing_code, " +
@@ -110,10 +110,12 @@ public interface MonthlyInventoryClosingRepository extends JpaRepository<Monthly
            "mic.actual_unit_price, " +
            "mic.actual_amount, " +
            "mic.diff_quantity, " +
-           "mic.diff_amount " +
+           "mic.diff_amount, " +
+           "COALESCE(wi.safe_quantity, 0) as safe_quantity " +
            "FROM monthly_inventory_closing mic " +
            "JOIN item i ON mic.item_code = i.item_code " +
            "LEFT JOIN item_category ic ON i.category_code = ic.category_code " +
+           "LEFT JOIN warehouse_items wi ON mic.warehouse_item_code = wi.warehouse_item_code " +
            "WHERE mic.closing_ym = :closingYm " +
            "AND (:warehouseCode IS NULL OR mic.warehouse_code = :warehouseCode) " +
            "AND (:itemSearch IS NULL OR " +

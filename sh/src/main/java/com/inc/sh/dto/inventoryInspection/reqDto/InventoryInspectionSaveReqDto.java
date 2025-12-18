@@ -20,6 +20,7 @@ public class InventoryInspectionSaveReqDto {
     @Builder
     public static class InventoryInspectionItemDto {
         private Integer closingCode;       // 마감코드 (closing_code) (필수)
+        private Integer safeQuantity;
         private Integer actualQuantity;    // 실사수량
         private Integer actualUnitPrice;   // 실사단가
     }

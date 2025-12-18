@@ -34,7 +34,7 @@ public class OrderService {
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
     private final NotificationService notificationService;
-    
+    private final DistCenterRepository distCenterRepository;
     /**
      * 주문 목록 조회
      */
@@ -186,7 +186,13 @@ public class OrderService {
                 throw new RuntimeException("주문 제한 시간입니다. " + limit.getLimitStartTime() + "~" + limit.getLimitEndTime() + " 시간에는 주문할 수 없습니다.");
             }
         }
-
+        
+        // 5. 물류센터 조회
+        DistCenter distCenter = distCenterRepository.findByDistCenterCode(saveDto.getDistCenterCode());
+        if (distCenter == null) {
+            throw new RuntimeException("존재하지 않는 물류센터입니다: " + saveDto.getDistCenterCode());
+        }
+        
         String orderNo;
         Order orderEntity;
         
@@ -200,6 +206,7 @@ public class OrderService {
                     .customerCode(saveDto.getCustomerCode())
                     .vehicleCode(saveDto.getVehicleCode())
                     .distCenterCode(saveDto.getDistCenterCode())
+                    .distCenterName(distCenter.getDistCenterName())
                     .customerName(customer.getCustomerName())
                     .bizNum(customer.getBizNum())
                     .zipCode(customer.getZipCode())
@@ -261,6 +268,9 @@ public class OrderService {
             orderEntity.setAddr(customer.getAddr());
             orderEntity.setOwnerName(customer.getOwnerName());
             orderEntity.setTelNum(customer.getTelNum());
+            
+            // 물류센터 정보 수정
+            orderEntity.setDistCenterName(distCenter.getDistCenterName());
             
             // 주문 관련 정보 업데이트
             orderEntity.setOrderDt(saveDto.getOrderDt());

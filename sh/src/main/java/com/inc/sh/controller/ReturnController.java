@@ -1,5 +1,6 @@
 package com.inc.sh.controller;
 
+import com.inc.sh.dto.returnManagement.reqDto.ReturnApprovalDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnDeleteReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSaveReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSearchDto;
@@ -177,4 +178,44 @@ public class ReturnController {
         RespDto<ReturnBatchResult> response = returnManagementService.deleteReturns(request);
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * 반품 승인/미승인 처리 (✅ 재고처리 포함)
+     * PUT /api/v1/erp/return/approval
+     */
+    @PutMapping("/approval")
+    public ResponseEntity<RespDto<ReturnBatchResult>> processReturnApproval(@RequestBody ReturnApprovalDto approvalDto) {
+        
+        log.info("반품 승인/미승인 처리 요청 - 액션: {}, 대상: {}건", 
+                approvalDto.getApprovalAction(), 
+                approvalDto.getReturnNos() != null ? approvalDto.getReturnNos().size() : 0);
+        
+        // 요청 데이터 검증
+        if (approvalDto.getReturnNos() == null || approvalDto.getReturnNos().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("처리할 반품번호가 없습니다."));
+        }
+        
+        if (!"승인".equals(approvalDto.getApprovalAction()) && !"미승인".equals(approvalDto.getApprovalAction())) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("승인액션은 '승인' 또는 '미승인'만 가능합니다."));
+        }
+        
+        // 중복 제거
+        List<String> uniqueReturnNos = approvalDto.getReturnNos().stream()
+                .filter(returnNo -> returnNo != null && !returnNo.trim().isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (uniqueReturnNos.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(RespDto.fail("유효한 반품번호가 없습니다."));
+        }
+        
+        approvalDto.setReturnNos(uniqueReturnNos);
+        
+        RespDto<ReturnBatchResult> response = returnManagementService.processReturnApproval(approvalDto);
+        return ResponseEntity.ok(response);
+    }
+    
 }

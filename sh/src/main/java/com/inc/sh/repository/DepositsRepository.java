@@ -44,15 +44,15 @@ public interface DepositsRepository extends JpaRepository<Deposits, Integer> {
            "WHERE (:customerCode IS NULL OR d.customer_code = :customerCode) " +
            "AND d.deposit_date >= :startDate " +
            "AND d.deposit_date <= :endDate " +
-           "AND (:depositTypeCode IS NULL OR " +
-           "  (CASE WHEN :depositTypeCode = 0 THEN c.deposit_type_code = 0 " +
-           "        WHEN :depositTypeCode = 1 THEN c.deposit_type_code = 1 END)) " +
+           "AND (:depositMethod IS NULL OR " +
+           "  (CASE WHEN :depositMethod = 0 THEN c.deposit_type_code = 0 " +
+           "        WHEN :depositMethod = 1 THEN c.deposit_type_code = 1 END)) " +
            "ORDER BY d.deposit_date DESC, d.deposit_id DESC", nativeQuery = true)
     List<Object[]> findCustomerDepositsWithConditions(
         @Param("customerCode") Integer customerCode,
         @Param("startDate") String startDate,
         @Param("endDate") String endDate,
-        @Param("depositTypeCode") Integer depositTypeCode
+        @Param("depositMethod") Integer depositMethod
     );
 
     /**
@@ -72,16 +72,16 @@ public interface DepositsRepository extends JpaRepository<Deposits, Integer> {
            "WHERE (:customerCode IS NULL OR d.customer_code = :customerCode) " +
            "AND d.deposit_date >= :startDate " +
            "AND d.deposit_date <= :endDate " +
-           "AND (:depositTypeCode IS NULL OR " +
-           "  (CASE WHEN :depositTypeCode = 0 THEN c.deposit_type_code = 0 " +
-           "        WHEN :depositTypeCode = 1 THEN c.deposit_type_code = 1 END)) " +
+           "AND (:depositMethod IS NULL OR " +
+           "  (CASE WHEN :depositMethod = 0 THEN c.deposit_type_code = 0 " +
+           "        WHEN :depositMethod = 1 THEN c.deposit_type_code = 1 END)) " +
            "AND c.hq_code = :hqCode " +
            "ORDER BY d.deposit_date DESC, d.deposit_id DESC", nativeQuery = true)
     List<Object[]> findCustomerDepositsWithConditionsWithHqCode(
         @Param("customerCode") Integer customerCode,
         @Param("startDate") String startDate,
         @Param("endDate") String endDate,
-        @Param("depositTypeCode") Integer depositTypeCode,
+        @Param("depositMethod") Integer depositMethod,
         @Param("hqCode") Integer hqCode
     );
 

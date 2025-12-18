@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -82,20 +83,22 @@ public class InventoryService {
     
     /**
      * 재고등록 저장
-     * 창고품목 기반으로 월별재고마감 테이블 생성/수정
+     * 창고품목 기반으로 월별재고마감 테이블 생성/수정 (각 품목의 warehouseCode 사용)
      */
     @Transactional
     public RespDto<String> saveInventory(InventorySaveDto saveDto) {
         try {
-            log.info("재고등록 저장 시작 - 창고코드: {}, 년월: {}, 품목수: {}", 
-                    saveDto.getWarehouseCode(), saveDto.getClosingYm(), 
+            log.info("재고등록 저장 시작 - 마감년월: {}, 품목수: {}", 
+                    saveDto.getClosingYm(), 
                     saveDto.getItems() != null ? saveDto.getItems().size() : 0);
             
-            // 마감 상태 체크
-            String closingCheckMessage = monthlyClosingService.getClosingCheckMessage(
-                    saveDto.getClosingYm(), saveDto.getWarehouseCode());
-            if (closingCheckMessage != null) {
-                return RespDto.fail(closingCheckMessage);
+            // 창고별로 그룹핑해서 로그 출력
+            if (saveDto.getItems() != null && !saveDto.getItems().isEmpty()) {
+                Map<Integer, Long> warehouseGroups = saveDto.getItems().stream()
+                        .collect(Collectors.groupingBy(
+                            InventoryItemDto::getWarehouseCode, 
+                            Collectors.counting()));
+                log.info("창고별 품목 분포: {}", warehouseGroups);
             }
             
             List<String> processedItems = new ArrayList<>();
@@ -103,9 +106,22 @@ public class InventoryService {
             
             for (InventoryItemDto itemDto : saveDto.getItems()) {
                 try {
-                    // 창고품목 확인/생성/수정
+                    // ✅ 각 품목의 warehouseCode 사용
+                    Integer warehouseCode = itemDto.getWarehouseCode();
+                    
+                    // 마감 상태 체크 (각 품목의 창고별로)
+                    String closingCheckMessage = monthlyClosingService.getClosingCheckMessage(
+                            saveDto.getClosingYm(), warehouseCode);
+                    if (closingCheckMessage != null) {
+                        log.warn("마감된 창고 - 품목코드: {}, 창고코드: {}, 메시지: {}", 
+                                itemDto.getItemCode(), warehouseCode, closingCheckMessage);
+                        // 에러를 던지지 말고 continue로 넘어가거나, 전체 중단할지 결정 필요
+                        throw new RuntimeException("품목코드 " + itemDto.getItemCode() + ": " + closingCheckMessage);
+                    }
+                    
+                    // 창고품목 확인/생성/수정 (각 품목의 창고코드 사용)
                     WarehouseItems warehouseItem = getOrCreateWarehouseItem(
-                            saveDto.getWarehouseCode(), itemDto.getItemCode(), itemDto);
+                            warehouseCode, itemDto.getItemCode(), itemDto);
                     
                     // 월별재고마감 데이터 확인/생성/수정
                     MonthlyInventoryClosing closing = getOrCreateMonthlyClosing(
@@ -114,12 +130,13 @@ public class InventoryService {
                     // 재고수불부 기록 추가
                     createInventoryTransaction(warehouseItem, itemDto, currentDate);
                     
-                    processedItems.add(itemDto.getItemCode().toString());
+                    processedItems.add(String.format("품목%d(창고%d)", itemDto.getItemCode(), warehouseCode));
                     
-                    log.info("재고 처리 완료 - 품목코드: {}", itemDto.getItemCode());
+                    log.info("재고 처리 완료 - 품목코드: {}, 창고코드: {}", itemDto.getItemCode(), warehouseCode);
                     
                 } catch (Exception e) {
-                    log.error("품목 처리 중 오류 발생 - 품목코드: {}", itemDto.getItemCode(), e);
+                    log.error("품목 처리 중 오류 발생 - 품목코드: {}, 창고코드: {}", 
+                            itemDto.getItemCode(), itemDto.getWarehouseCode(), e);
                     throw e;
                 }
             }
@@ -213,7 +230,7 @@ public class InventoryService {
     }
     
     /**
-     * 월별재고마감 확인/생성/수정
+     * 월별재고마감 생성/수정 (✅ 재고등록시 입고량/입고액 설정)
      */
     private MonthlyInventoryClosing getOrCreateMonthlyClosing(
             WarehouseItems warehouseItem, String closingYm, InventoryItemDto itemDto) {
@@ -222,16 +239,33 @@ public class InventoryService {
                 .findByWarehouseItemCodeAndClosingYm(warehouseItem.getWarehouseItemCode(), closingYm);
         
         if (existing.isPresent()) {
-            // 기존 데이터 수정
+            // ✅ 기존 데이터 수정 - 입고량/입고액 증가
             MonthlyInventoryClosing closing = existing.get();
+            
+            // 기존 입고량에 추가
+            closing.setInQuantity(closing.getInQuantity() + itemDto.getActualQuantity());
+            closing.setInAmount(closing.getInAmount() + itemDto.getActualAmount());
+            
+            // 실제 재고 업데이트
             closing.setActualQuantity(itemDto.getActualQuantity());
             closing.setActualUnitPrice(itemDto.getActualUnitPrice());
             closing.setActualAmount(itemDto.getActualAmount());
             
+            // 계산재고 재계산 (이월 + 입고 - 출고)
+            closing.setCalQuantity(closing.getOpeningQuantity() + closing.getInQuantity() - closing.getOutQuantity());
+            closing.setCalAmount(closing.getOpeningAmount() + closing.getInAmount() - closing.getOutAmount());
+            
+            // 차이량 계산 (실제 - 계산)
+            closing.setDiffQuantity(closing.getActualQuantity() - closing.getCalQuantity());
+            closing.setDiffAmount(closing.getActualAmount() - closing.getCalAmount());
+            
+            log.info("월별재고마감 수정 - 품목코드: {}, 입고량 추가: {}, 입고액 추가: {}", 
+                    warehouseItem.getItemCode(), itemDto.getActualQuantity(), itemDto.getActualAmount());
+            
             return monthlyInventoryClosingRepository.save(closing);
         }
         
-        // 새로운 월별재고마감 생성
+        // ✅ 새로운 월별재고마감 생성 - 재고등록을 입고로 처리
         MonthlyInventoryClosing newClosing = MonthlyInventoryClosing.builder()
                 .warehouseItemCode(warehouseItem.getWarehouseItemCode())
                 .warehouseCode(warehouseItem.getWarehouseCode())
@@ -239,19 +273,25 @@ public class InventoryService {
                 .closingYm(closingYm)
                 .openingQuantity(0)  // 최초등록시 이월은 0
                 .openingAmount(0)
-                .inQuantity(0)
-                .inAmount(0)
-                .outQuantity(0)
-                .outAmount(0)
-                .calQuantity(itemDto.getActualQuantity())
-                .calAmount(itemDto.getActualAmount())
-                .actualQuantity(itemDto.getActualQuantity())
+                // ✅ 재고등록을 입고로 처리
+                .inQuantity(itemDto.getActualQuantity())      // 입고량 = 등록된 수량
+                .inAmount(itemDto.getActualAmount())          // 입고액 = 등록된 금액
+                .outQuantity(0)      // 출고량 0
+                .outAmount(0)        // 출고액 0
+                // 계산재고 = 이월 + 입고 - 출고
+                .calQuantity(itemDto.getActualQuantity())     // 0 + 입고량 - 0
+                .calAmount(itemDto.getActualAmount())         // 0 + 입고액 - 0
+                .actualQuantity(itemDto.getActualQuantity())  // 실제재고
                 .actualUnitPrice(itemDto.getActualUnitPrice())
-                .actualAmount(itemDto.getActualAmount())
-                .diffQuantity(0)
-                .diffAmount(0)
+                .actualAmount(itemDto.getActualAmount())      // 실제금액
+                // 차이량 = 실제 - 계산 = 실제 - 실제 = 0
+                .diffQuantity(0)     // 일치
+                .diffAmount(0)       // 일치
                 .isClosed(false)
                 .build();
+        
+        log.info("월별재고마감 신규 생성 - 품목코드: {}, 입고량: {}, 입고액: {}", 
+                warehouseItem.getItemCode(), itemDto.getActualQuantity(), itemDto.getActualAmount());
         
         return monthlyInventoryClosingRepository.save(newClosing);
     }

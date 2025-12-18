@@ -37,13 +37,13 @@ public class CustomerDepositService {
         try {
             log.info("거래처수금처리 조회 시작 - hqCode: {}, 거래처: {}, 기간: {}~{}, 입금유형: {}", 
                     searchDto.getHqCode(), searchDto.getCustomerCode(), searchDto.getStartDate(), 
-                    searchDto.getEndDate(), searchDto.getDepositTypeCode());
+                    searchDto.getEndDate(), searchDto.getDepositMethod());
             
             List<Object[]> results = depositsRepository.findCustomerDepositsWithConditionsWithHqCode(
                     searchDto.getCustomerCode(),
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
-                    searchDto.getDepositTypeCode(),
+                    searchDto.getDepositMethod(),
                     searchDto.getHqCode()
             );
             

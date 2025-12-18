@@ -16,6 +16,7 @@ public class InventoryInspectionRespDto {
     private String specification;       // 규격
     private String unit;                // 단위
     private String transactionType;     // 최근거래유형
+    private Integer safeQuantity;       // 안전재고량
     
     // 전기이월
     private Integer openingQuantity;    // 전기이월수량

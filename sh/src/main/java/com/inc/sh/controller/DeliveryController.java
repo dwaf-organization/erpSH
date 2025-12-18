@@ -1,6 +1,7 @@
 package com.inc.sh.controller;
 
 import com.inc.sh.dto.delivery.reqDto.*;
+import com.inc.sh.dto.delivery.respDto.DeliveryBatchResult;
 import com.inc.sh.dto.order.respDto.*;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.service.DeliveryService;
@@ -71,15 +72,15 @@ public class DeliveryController {
     }
 
     /**
-     * 배송시작 (배송요청 → 배송중)
+     * 배송시작 (배송요청 → 배송중) - ✅ 배치 응답
      * POST /api/v1/erp/delivery/start
      */
     @PostMapping("/start")
-    public ResponseEntity<RespDto<List<String>>> startDelivery(@RequestBody DeliveryStartDto startDto) {
+    public ResponseEntity<RespDto<DeliveryBatchResult>> startDelivery(@RequestBody DeliveryStartDto startDto) {
         
         log.info("배송시작 요청 - 주문수: {}", startDto.getOrders() != null ? startDto.getOrders().size() : 0);
         
-        RespDto<List<String>> response = deliveryService.startDelivery(startDto);
+        RespDto<DeliveryBatchResult> response = deliveryService.startDelivery(startDto);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);
@@ -89,15 +90,15 @@ public class DeliveryController {
     }
 
     /**
-     * 배송취소 (배송중 → 배송요청)
+     * 배송취소 (배송중 → 배송요청) - ✅ 배치 응답
      * POST /api/v1/erp/delivery/cancel
      */
     @PostMapping("/cancel")
-    public ResponseEntity<RespDto<List<String>>> cancelDelivery(@RequestBody DeliveryCancelDto cancelDto) {
+    public ResponseEntity<RespDto<DeliveryBatchResult>> cancelDelivery(@RequestBody DeliveryCancelDto cancelDto) {
         
         log.info("배송취소 요청 - 주문수: {}", cancelDto.getOrderNos() != null ? cancelDto.getOrderNos().size() : 0);
         
-        RespDto<List<String>> response = deliveryService.cancelDelivery(cancelDto);
+        RespDto<DeliveryBatchResult> response = deliveryService.cancelDelivery(cancelDto);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);
@@ -107,15 +108,15 @@ public class DeliveryController {
     }
 
     /**
-     * 배송완료 (배송요청/배송중 → 배송완료)
+     * 배송완료 (배송요청/배송중 → 배송완료) - ✅ 배치 응답
      * POST /api/v1/erp/delivery/complete
      */
     @PostMapping("/complete")
-    public ResponseEntity<RespDto<List<String>>> completeDelivery(@RequestBody DeliveryCompleteDto completeDto) {
+    public ResponseEntity<RespDto<DeliveryBatchResult>> completeDelivery(@RequestBody DeliveryCompleteDto completeDto) {
         
         log.info("배송완료 요청 - 주문수: {}", completeDto.getOrderNos() != null ? completeDto.getOrderNos().size() : 0);
         
-        RespDto<List<String>> response = deliveryService.completeDelivery(completeDto);
+        RespDto<DeliveryBatchResult> response = deliveryService.completeDelivery(completeDto);
         
         if (response.getCode() == 1) {
             return ResponseEntity.ok(response);
