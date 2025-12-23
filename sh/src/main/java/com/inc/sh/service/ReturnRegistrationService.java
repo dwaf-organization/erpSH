@@ -204,6 +204,7 @@ public class ReturnRegistrationService {
                 .totalAmount(orderItem != null ? orderItem.getTotalAmt() : null)
                 .distCenterCode(distCenterCode)
                 .distCenterName(distCenterName)
+                .availableReturnQty(viewItem.getAvailableReturnQty())
                 .build();
     }
 }

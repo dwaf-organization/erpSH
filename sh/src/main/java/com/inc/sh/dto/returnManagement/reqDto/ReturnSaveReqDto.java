@@ -36,6 +36,7 @@ public class ReturnSaveReqDto {
         private BigDecimal vat;                     // 부가세
         private BigDecimal totalAmount;             // 합계금액
         private String returnMessage;               // 반품사유
+        private String replyMessage;				// 답변메시지
         private String note;                        // 비고
         private String progressStatus;              // 진행상태
         private String warehouseName;               // 창고명

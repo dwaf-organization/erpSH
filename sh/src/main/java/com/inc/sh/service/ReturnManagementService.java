@@ -264,6 +264,7 @@ public class ReturnManagementService {
                     .vatAmt(saveDto.getVat() != null ? saveDto.getVat().intValue() : orderItem.getVatAmt())
                     .totalAmt(saveDto.getTotalAmount() != null ? saveDto.getTotalAmount().intValue() : orderItem.getTotalAmt())
                     .returnMessage(saveDto.getReturnMessage())
+                    .replyMessage(saveDto.getReplyMessage())
                     .note(saveDto.getNote())
                     .progressStatus(saveDto.getProgressStatus() != null ? saveDto.getProgressStatus() : "미승인")
                     .build();
@@ -310,6 +311,7 @@ public class ReturnManagementService {
             }
             
             returnEntity.setReturnMessage(saveDto.getReturnMessage());
+            returnEntity.setReplyMessage(saveDto.getReplyMessage());
             returnEntity.setNote(saveDto.getNote());
             returnEntity.setProgressStatus(saveDto.getProgressStatus());
             returnEntity.setWarehouseName(saveDto.getWarehouseName());
@@ -422,6 +424,7 @@ public class ReturnManagementService {
                 .status(returnEntity.getProgressStatus())
                 .returnApprovalDate(returnEntity.getReturnApproveDt())
                 .returnMessage(returnEntity.getReturnMessage())
+                .replyMessage(returnEntity.getReplyMessage())
                 .message(returnEntity.getReplyMessage())
                 .note(returnEntity.getNote())
                 .orderNo(returnEntity.getOrderNo())
@@ -506,7 +509,7 @@ public class ReturnManagementService {
                     
                     // 승인사유 업데이트 (선택사항)
                     if (approvalDto.getApprovalNote() != null) {
-                        returnEntity.setNote(approvalDto.getApprovalNote());
+                        returnEntity.setReplyMessage(approvalDto.getApprovalNote());
                     }
                     
                     returnEntity = returnRepository.save(returnEntity);
