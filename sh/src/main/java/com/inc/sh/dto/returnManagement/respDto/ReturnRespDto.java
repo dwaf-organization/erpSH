@@ -44,12 +44,8 @@ public class ReturnRespDto {
     
     // 상태/메모
     private String status;                  // 진행상태
-    private String message;                 // 메시지
     private String note;                    // 비고
     private String returnMessage;           // 반품사유
     private String replyMessage;			// 답변메시지
     
-    // 기타 반품테이블 항목들
-    private String returnType;              // 반품유형
-    private String processedBy;             // 처리자
 }

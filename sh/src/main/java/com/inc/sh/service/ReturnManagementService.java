@@ -99,8 +99,9 @@ public class ReturnManagementService {
                                 .distCenterName((String) result[17])
                                 .status((String) result[18])
                                 .returnApprovalDate((String) result[19])
-                                .message((String) result[20])
+                                .replyMessage((String) result[20])
                                 .note((String) result[21])
+                                .returnMessage((String) result[22])
                                 .orderNo((String) result[24])
                                 .unitPrice((Integer) result[25])
                                 .orderItemCode(result[26] != null ? ((Number) result[26]).intValue() : null)
@@ -431,7 +432,6 @@ public class ReturnManagementService {
                 .returnApprovalDate(returnEntity.getReturnApproveDt())
                 .returnMessage(returnEntity.getReturnMessage())
                 .replyMessage(returnEntity.getReplyMessage())
-                .message(returnEntity.getReplyMessage())
                 .note(returnEntity.getNote())
                 .orderNo(returnEntity.getOrderNo())
                 .build();
