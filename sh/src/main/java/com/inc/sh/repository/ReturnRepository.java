@@ -353,12 +353,16 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
            "r.return_message, " +                 // 22
            "r.warehouse_name as stored_warehouse_name, " +  // 23
            "r.order_no as order_no, " +            // 24
-           "r.unit_price " +            // 25
+           "r.unit_price, " +                      // 25
+           "r.order_item_code, " +                 // 26 - 주문품목코드 추가
+           "oi.order_qty, " +                      // 27 - 주문수량 추가
+           "(oi.order_qty - oi.returned_qty) as available_return_qty " + // 28 - 반품가능수량 추가
            "FROM `return` r " +
            "LEFT JOIN customer c ON r.return_customer_code = c.customer_code " +
            "LEFT JOIN warehouse w ON r.receive_warehouse_code = w.warehouse_code " +
            "LEFT JOIN dist_center dc ON w.dist_center_code = dc.dist_center_code " +
            "LEFT JOIN `order` o ON r.order_no = o.order_no " +  // order 테이블 조인
+           "LEFT JOIN order_item oi ON r.order_item_code = oi.order_item_code " +
            "WHERE " +
            "(:startDate IS NULL OR r.return_request_dt >= :startDate) AND " +
            "(:endDate IS NULL OR r.return_request_dt <= :endDate) AND " +

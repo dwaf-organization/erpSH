@@ -103,6 +103,9 @@ public class ReturnManagementService {
                                 .note((String) result[21])
                                 .orderNo((String) result[24])
                                 .unitPrice((Integer) result[25])
+                                .orderItemCode(result[26] != null ? ((Number) result[26]).intValue() : null)
+                                .orderQuantity(result[27] != null ? ((Number) result[27]).intValue() : null)  
+                                .availableReturnQty(result[28] != null ? ((Number) result[28]).intValue() : null)
                                 .build();
                         return dto;
                     })
