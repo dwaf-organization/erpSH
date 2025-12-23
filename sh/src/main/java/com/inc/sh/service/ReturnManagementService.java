@@ -4,7 +4,6 @@ import com.inc.sh.dto.returnManagement.reqDto.ReturnApprovalDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnDeleteReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSaveReqDto;
 import com.inc.sh.dto.returnManagement.reqDto.ReturnSearchDto;
-import com.inc.sh.dto.returnManagement.reqDto.ReturnUpdateDto;
 import com.inc.sh.dto.returnManagement.respDto.ReturnBatchResult;
 import com.inc.sh.dto.returnManagement.respDto.ReturnRespDto;
 import com.inc.sh.common.dto.RespDto;
@@ -36,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -227,9 +225,8 @@ public class ReturnManagementService {
                 throw new RuntimeException("주문품목과 주문번호가 일치하지 않습니다.");
             }
 
-            // 8. 반품가능수량 확인
-            Integer totalReturnedQty = returnRepository.getTotalReturnedQtyByOrderItemCode(saveDto.getOrderItemCode());
-            Integer availableReturnQty = orderItem.getOrderQty() - (totalReturnedQty != null ? totalReturnedQty : 0);
+            // 8. 반품가능수량 확인 (✅ order_item.returned_qty 직접 사용)
+            Integer availableReturnQty = orderItem.getOrderQty() - orderItem.getReturnedQty();
             
             if (saveDto.getQty() > availableReturnQty) {
                 throw new RuntimeException("반품가능수량을 초과했습니다. 가능수량: " + availableReturnQty + "개, 요청수량: " + saveDto.getQty() + "개");
@@ -270,6 +267,9 @@ public class ReturnManagementService {
                     .build();
             
             returnEntity = returnRepository.save(returnEntity);
+            
+            // ✅ order_item.returned_qty 업데이트 (앱과 동일한 로직 추가)
+            orderItemRepository.updateReturnedQty(saveDto.getOrderItemCode(), saveDto.getQty());
             
             log.info("반품 신규 생성 - returnNo: {}, customerName: {}", returnNo, customer.getCustomerName());
             
@@ -394,10 +394,13 @@ public class ReturnManagementService {
             throw new RuntimeException("해당 반품을 찾을 수 없거나 이미 승인된 반품은 삭제할 수 없습니다: " + returnNo);
         }
         
+        // ✅ order_item.returned_qty 복원 (반품신청했던 수량을 차감)
+        orderItemRepository.updateReturnedQty(returnToDelete.getOrderItemCode(), -returnToDelete.getQty());
+        
         // Hard Delete
         returnRepository.delete(returnToDelete);
         
-        log.info("반품 삭제 완료 - returnNo: {}, customerName: {}", 
+        log.info("반품 삭제 완료 (returned_qty 복원 포함) - returnNo: {}, customerName: {}", 
                 returnNo, returnToDelete.getReturnCustomerName());
     }
     
