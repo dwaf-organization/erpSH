@@ -10,6 +10,18 @@ import java.util.List;
 
 @Repository
 public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, Integer> {
+    /**
+     * 거래처코드와 상태로 가상계좌들 조회 (선택적 사용)
+     */
+    List<VirtualAccount> findByLinkedCustomerCodeAndVirtualAccountStatus(
+            Integer linkedCustomerCode, String virtualAccountStatus);
+    
+    /**
+     * 거래처별 가상계좌 개수 조회 (통계용)
+     */
+    @Query(value = "SELECT COUNT(*) FROM virtual_account " +
+           "WHERE linked_customer_code = :customerCode", nativeQuery = true)
+    Long countByLinkedCustomerCode(@Param("customerCode") Integer customerCode);
     
     /**
      * 가상계좌코드로 가상계좌 조회
@@ -44,10 +56,10 @@ public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, 
            "LEFT JOIN customer c ON va.linked_customer_code = c.customer_code AND c.hq_code = va.hq_code " +
            "WHERE va.hq_code = :hqCode " +
            "AND (:linkedCustomerCode IS NULL OR va.linked_customer_code = :linkedCustomerCode) " +
-           "AND (:virtualAccountStatus = '전체' OR " +
+           "AND (:virtualAccountStatus = '' OR " +
            "     (CASE WHEN :virtualAccountStatus = '사용' THEN va.virtual_account_status = '사용' " +
            "           WHEN :virtualAccountStatus = '미사용' THEN va.virtual_account_status = '미사용' END)) " +
-           "AND (:closeDtYn = '전체' OR " +
+           "AND (:closeDtYn = '' OR " +
            "     (CASE WHEN :closeDtYn = 'Y' THEN va.close_dt IS NOT NULL " +
            "           WHEN :closeDtYn = 'N' THEN va.close_dt IS NULL END)) " +
            "ORDER BY va.virtual_account_code DESC", nativeQuery = true)
@@ -106,9 +118,7 @@ public interface VirtualAccountRepository extends JpaRepository<VirtualAccount, 
            "va.open_dt, " +                     // 6
            "va.close_dt, " +                    // 7
            "va.note, " +                        // 8
-           "va.created_at, " +                  // 9
-           "va.updated_at, " +                  // 10
-           "c.customer_name " +                 // 11
+           "c.customer_name " +                 // 9
            "FROM virtual_account va " +
            "LEFT JOIN customer c ON va.linked_customer_code = c.customer_code AND c.hq_code = va.hq_code " +
            "WHERE va.hq_code = :hqCode " +

@@ -34,8 +34,8 @@ public class VirtualAccountController {
     public ResponseEntity<RespDto<List<VirtualAccountRespDto>>> getVirtualAccountList(
             @RequestParam("hqCode") Integer hqCode,
             @RequestParam(value = "linkedCustomerCode", required = false) Integer linkedCustomerCode,
-            @RequestParam(value = "virtualAccountStatus", defaultValue = "전체") String virtualAccountStatus,
-            @RequestParam(value = "closeDtYn", defaultValue = "전체") String closeDtYn) {
+            @RequestParam(value = "virtualAccountStatus") String virtualAccountStatus,
+            @RequestParam(value = "closeDtYn") String closeDtYn) {
         
         log.info("가상계좌 목록 조회 요청 - hqCode: {}, linkedCustomerCode: {}, virtualAccountStatus: {}, closeDtYn: {}", 
                 hqCode, linkedCustomerCode, virtualAccountStatus, closeDtYn);

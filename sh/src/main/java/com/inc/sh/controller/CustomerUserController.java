@@ -82,13 +82,6 @@ public class CustomerUserController {
                         .body(RespDto.fail(String.format("%d번째 항목: 사용자명은 필수입니다.", i + 1)));
             }
             
-            // 신규 시 비밀번호 필수 체크
-            boolean isUpdate = item.getCustomerUserCode() != null;
-            if (!isUpdate && (item.getCustomerUserPw() == null || item.getCustomerUserPw().trim().isEmpty())) {
-                return ResponseEntity.badRequest()
-                        .body(RespDto.fail(String.format("%d번째 항목: 신규 사용자는 비밀번호가 필수입니다.", i + 1)));
-            }
-            
             // 기본값 설정
             if (item.getEndYn() == null) {
                 item.setEndYn(0); // 기본값: 사용중

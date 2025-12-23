@@ -5,9 +5,16 @@ import com.inc.sh.dto.returnRegistration.reqDto.ReturnRegistrationSaveDto;
 import com.inc.sh.dto.returnRegistration.respDto.ReturnOrderItemRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.entity.Return;
+import com.inc.sh.entity.Customer;
 import com.inc.sh.entity.OrderItem;
+import com.inc.sh.entity.OrderItemReturnStatus;
+import com.inc.sh.repository.CustomerRepository;
+import com.inc.sh.repository.DistCenterRepository;
 import com.inc.sh.repository.OrderItemRepository;
+import com.inc.sh.repository.OrderItemReturnStatusRepository;
 import com.inc.sh.repository.ReturnRepository;
+import com.inc.sh.repository.WarehouseRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,41 +32,27 @@ public class ReturnRegistrationService {
     
     private final OrderItemRepository orderItemRepository;
     private final ReturnRepository returnRepository;
+    private final CustomerRepository customerRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final DistCenterRepository distCenterRepository;
+    
+    // ✅ 반품가능 주문품목 뷰 조회용 Repository 추가
+    private final OrderItemReturnStatusRepository orderItemReturnStatusRepository;
     
     /**
-     * 반품등록용 주문품목 조회
+     * 반품등록용 주문품목 조회 (✅ 뷰 사용)
      */
     @Transactional(readOnly = true)
     public RespDto<List<ReturnOrderItemRespDto>> getOrderItemsForReturn(ReturnOrderSearchDto searchDto) {
         try {
             log.info("반품등록용 주문품목 조회 시작 - 조건: {}", searchDto);
             
-            List<Object[]> results = orderItemRepository.findOrderItemsForReturn(
-                    searchDto.getCustomerCode(),
-                    searchDto.getOrderNo()
-            );
+            // ✅ 뷰에서 반품가능한 주문품목 직접 조회
+            List<OrderItemReturnStatus> returnableItems = orderItemReturnStatusRepository
+                    .findReturnableItems(searchDto.getCustomerCode(), searchDto.getOrderNo());
             
-            List<ReturnOrderItemRespDto> orderItemList = results.stream()
-                    .map(result -> ReturnOrderItemRespDto.builder()
-                            .customerCode((Integer) result[0])
-                            .customerName((String) result[1])
-                            .orderNo((String) result[2])
-                            .itemCode((Integer) result[3])
-                            .itemName((String) result[4])
-                            .specification((String) result[5])
-                            .unit((String) result[6])
-                            .priceType(result[7] != null ? result[7].toString() : null)
-                            .orderPrice((Integer) result[8])
-                            .orderQuantity((Integer) result[9])
-                            .taxTarget((String) result[10])
-                            .warehouseCode((Integer) result[11])
-                            .warehouseName((String) result[12])
-                            .taxableAmount((Integer) result[13])
-                            .taxFreeAmount((Integer) result[14])
-                            .supplyAmount((Integer) result[15])
-                            .vatAmount((Integer) result[16])
-                            .totalAmount((Integer) result[17])
-                            .build())
+            List<ReturnOrderItemRespDto> orderItemList = returnableItems.stream()
+                    .map(this::convertViewToReturnOrderItemDto)
                     .collect(Collectors.toList());
             
             log.info("반품등록용 주문품목 조회 완료 - 조회 건수: {}", orderItemList.size());
@@ -159,5 +152,58 @@ public class ReturnRegistrationService {
         }
         
         return String.format("%s%03d", datePrefix, sequence);
+    }
+    
+    /**
+     * ✅ OrderItemReturnStatus(뷰) -> ReturnOrderItemRespDto 변환
+     */
+    private ReturnOrderItemRespDto convertViewToReturnOrderItemDto(OrderItemReturnStatus viewItem) {
+        // 실제 OrderItem에서 추가 정보 조회 (필요한 필드들)
+        OrderItem orderItem = orderItemRepository.findByOrderItemCode(viewItem.getOrderItemCode());
+        
+        // ✅ 창고명 조회
+        String warehouseName = null;
+        if (orderItem != null && orderItem.getReleaseWarehouseCode() != null) {
+            warehouseName = warehouseRepository.findById(orderItem.getReleaseWarehouseCode())
+                    .map(warehouse -> warehouse.getWarehouseName())
+                    .orElse(null);
+        }
+        
+        // ✅ 거래처로부터 물류센터 정보 조회
+        Integer distCenterCode = null;
+        String distCenterName = null;
+        if (viewItem.getCustomerCode() != null) {
+            Customer customer = customerRepository.findByCustomerCode(viewItem.getCustomerCode());
+            if (customer != null && customer.getDistCenterCode() != null) {
+                distCenterCode = customer.getDistCenterCode();
+                distCenterName = distCenterRepository.findById(distCenterCode)
+                        .map(distCenter -> distCenter.getDistCenterName())
+                        .orElse(null);
+            }
+        }
+        
+        return ReturnOrderItemRespDto.builder()
+                .customerCode(viewItem.getCustomerCode())
+                .customerName(viewItem.getCustomerName())
+                .orderItemCode(viewItem.getOrderItemCode())
+                .orderNo(viewItem.getOrderNo())
+                .itemCode(viewItem.getItemCode())
+                .itemName(viewItem.getItemName())
+                .specification(orderItem != null ? orderItem.getSpecification() : null)
+                .unit(orderItem != null ? orderItem.getUnit() : null)
+                .priceType(orderItem != null ? orderItem.getPriceType().toString() : null)
+                .orderPrice(orderItem != null ? orderItem.getOrderUnitPrice() : null)
+                .orderQuantity(viewItem.getOrderQty())
+                .taxTarget(orderItem != null ? orderItem.getTaxTarget() : null)
+                .warehouseCode(orderItem != null ? orderItem.getReleaseWarehouseCode() : null)
+                .warehouseName(warehouseName)
+                .taxableAmount(orderItem != null ? orderItem.getTaxableAmt() : null)
+                .taxFreeAmount(orderItem != null ? orderItem.getTaxFreeAmt() : null)
+                .supplyAmount(orderItem != null ? orderItem.getSupplyAmt() : null)
+                .vatAmount(orderItem != null ? orderItem.getVatAmt() : null)
+                .totalAmount(orderItem != null ? orderItem.getTotalAmt() : null)
+                .distCenterCode(distCenterCode)
+                .distCenterName(distCenterName)
+                .build();
     }
 }

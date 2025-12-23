@@ -60,7 +60,7 @@ public class CommonService {
             }
             
             // 본사별 브랜드 조회
-            List<BrandInfo> brands = brandRepository.findByHqCode(hqCode);
+            List<BrandInfo> brands = brandRepository.findByHqCodeOrderByBrandCodeDesc(hqCode);
             
             // DTO 변환
             List<BrandSelectDto> selectList = brands.stream()

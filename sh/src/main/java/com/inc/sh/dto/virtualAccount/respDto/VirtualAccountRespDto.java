@@ -55,7 +55,7 @@ public class VirtualAccountRespDto {
                 .openDt(convertToString(result[6]))
                 .closeDt(convertToString(result[7]))
                 .note(convertToString(result[8]))
-                .customerName(convertToString(result[11]))    // customer_name
+                .customerName(convertToString(result[9]))    // customer_name
                 .build();
     }
     

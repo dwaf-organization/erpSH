@@ -9,7 +9,10 @@ import com.inc.sh.dto.customer.respDto.CustomerBatchResult;
 import com.inc.sh.dto.customer.respDto.CustomerDeleteRespDto;
 import com.inc.sh.dto.customer.respDto.CustomerRespDto;
 import com.inc.sh.entity.Customer;
+import com.inc.sh.entity.VirtualAccount;
 import com.inc.sh.repository.CustomerRepository;
+import com.inc.sh.repository.VirtualAccountRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 public class CustomerService {
     
     private final CustomerRepository customerRepository;
+    private final VirtualAccountRepository virtualAccountRepository;
     
     /**
      * 거래처 목록 조회 (브랜드명, 물류센터명 포함)
@@ -443,25 +447,83 @@ public class CustomerService {
     }
     
     /**
-     * 개별 거래처 삭제 처리 (폐기일자 설정)
+     * 개별 거래처 삭제 처리 (가상계좌 연결 해제 + 사업자번호 초기화 포함)
      */
     private void deleteSingleCustomer(Integer customerCode) {
-        
+
         Customer customer = customerRepository.findByCustomerCode(customerCode);
         if (customer == null) {
             throw new RuntimeException("존재하지 않는 거래처입니다: " + customerCode);
         }
-        
+
         // 이미 폐기된 거래처인지 확인
         if (customer.getCloseDt() != null) {
             throw new RuntimeException("이미 폐기된 거래처입니다.");
         }
-        
-        // 폐기일자를 현재일로 설정
-        String currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        customer.setCloseDt(currentDate);
-        
-        customerRepository.save(customer);
+
+        try {
+            // 1. 가상계좌 연결 해제 처리
+            disconnectVirtualAccounts(customerCode);
+            
+            // 2. 사업자번호 초기화
+            customer.setBizNum("0");
+            
+            // 3. 폐기일자를 현재일로 설정
+            String currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            customer.setCloseDt(currentDate);
+
+            // 4. 가상계좌 null처리
+            customer.setVirtualAccountCode(null);
+            customer.setVirtualAccount(null);
+            customer.setVirtualBankName(null);
+            
+            customerRepository.save(customer);
+            
+            log.info("거래처 삭제 처리 완료 - customerCode: {}, 가상계좌 연결해제 완료, 사업자번호 초기화 완료", customerCode);
+            
+        } catch (Exception e) {
+            log.error("거래처 삭제 처리 중 오류 발생 - customerCode: {}", customerCode, e);
+            throw new RuntimeException("거래처 삭제 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 가상계좌 연결 해제 처리
+     */
+    private void disconnectVirtualAccounts(Integer customerCode) {
+        try {
+            // 해당 거래처에 연결된 가상계좌들 조회
+            List<VirtualAccount> linkedAccounts = virtualAccountRepository
+                    .findByLinkedCustomerCode(customerCode);
+            
+            if (!linkedAccounts.isEmpty()) {
+                log.info("거래처 연결 가상계좌 발견 - customerCode: {}, 가상계좌 수: {}", 
+                        customerCode, linkedAccounts.size());
+                
+                for (VirtualAccount account : linkedAccounts) {
+                    // linked_customer_code를 NULL로 설정
+                    account.setLinkedCustomerCode(null);
+                    
+                    // virtual_account_status를 '미사용'으로 변경
+                    account.setVirtualAccountStatus("미사용");
+                    
+                    virtualAccountRepository.save(account);
+                    
+                    log.info("가상계좌 연결 해제 완료 - virtualAccountCode: {}, accountNum: {}", 
+                            account.getVirtualAccountCode(), account.getVirtualAccountNum());
+                }
+                
+                log.info("전체 가상계좌 연결 해제 완료 - customerCode: {}, 처리된 계좌 수: {}", 
+                        customerCode, linkedAccounts.size());
+                
+            } else {
+                log.info("연결된 가상계좌 없음 - customerCode: {}", customerCode);
+            }
+            
+        } catch (Exception e) {
+            log.error("가상계좌 연결 해제 중 오류 발생 - customerCode: {}", customerCode, e);
+            throw new RuntimeException("가상계좌 연결 해제 중 오류가 발생했습니다: " + e.getMessage());
+        }
     }
     
     /**

@@ -79,7 +79,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
            "WHERE (:warehouseCode IS NULL OR w.warehouseCode = :warehouseCode) AND " +
            "(:distCenterCode IS NULL OR w.distCenterCode = :distCenterCode) AND " +
            "w.hqCode = :hqCode " +
-           "ORDER BY w.warehouseCode ASC")
+           "ORDER BY w.warehouseCode DESC")
     List<Object[]> findWarehousesWithDistCenterNameAndHqCodeAll(
         @Param("warehouseCode") Integer warehouseCode,
         @Param("distCenterCode") Integer distCenterCode,

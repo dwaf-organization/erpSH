@@ -363,6 +363,7 @@ public class ItemService {
         // Soft Delete - 종료일자를 현재일로 설정
         String currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         item.setEndDt(currentDate);
+        item.setCategoryCode(0);
         
         itemRepository.save(item);
     }

@@ -39,7 +39,7 @@ public interface ItemCategoryRepository extends JpaRepository<ItemCategory, Inte
      * @param categoryCode 기준 분류코드
      * @return 본인 + 하위 분류 목록
      */
-    @Query("SELECT ic FROM ItemCategory ic WHERE ic.categoryCode = :categoryCode OR ic.parentsCategoryCode = :categoryCode ORDER BY ic.categoryLevel, ic.categoryCode")
+    @Query("SELECT ic FROM ItemCategory ic WHERE ic.categoryCode = :categoryCode OR ic.parentsCategoryCode = :categoryCode ORDER BY ic.categoryCode, ic.categoryLevel")
     List<ItemCategory> findByParentAndChildren(@Param("categoryCode") Integer categoryCode);
     
     /**
@@ -48,7 +48,7 @@ public interface ItemCategoryRepository extends JpaRepository<ItemCategory, Inte
      * @param hqCode 본사코드
      * @return 본인 + 하위 분류 목록
      */
-    @Query("SELECT ic FROM ItemCategory ic WHERE (ic.categoryCode = :categoryCode OR ic.parentsCategoryCode = :categoryCode) ORDER BY ic.categoryLevel, ic.categoryCode")
+    @Query("SELECT ic FROM ItemCategory ic WHERE (ic.categoryCode = :categoryCode OR ic.parentsCategoryCode = :categoryCode) ORDER BY ic.categoryCode, ic.categoryLevel")
     List<ItemCategory> findByParentAndChildrenWithHqCode(@Param("categoryCode") Integer categoryCode);
     
     /**
@@ -59,7 +59,7 @@ public interface ItemCategoryRepository extends JpaRepository<ItemCategory, Inte
     /**
      * 대분류만 조회 (parentsCategoryCode = 0)
      */
-    @Query("SELECT ic FROM ItemCategory ic WHERE ic.parentsCategoryCode = 0 ORDER BY ic.categoryLevel, ic.categoryCode")
+    @Query("SELECT ic FROM ItemCategory ic WHERE ic.parentsCategoryCode = 0 ORDER BY ic.categoryCode, ic.categoryLevel")
     List<ItemCategory> findTopCategories();
     
     /**

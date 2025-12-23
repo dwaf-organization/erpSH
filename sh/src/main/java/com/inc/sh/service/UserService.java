@@ -60,7 +60,7 @@ public class UserService {
                             .resignationDt(formatResignationDate((String) result[5]))
                             .roleCode((Integer) result[6])
                             .roleName((String) result[7])
-                            .userPw((String) result[8])
+                            .userPw(null)
                             .ledgerUsageYn((Integer) result[9])
                             .build())
                     .collect(Collectors.toList());

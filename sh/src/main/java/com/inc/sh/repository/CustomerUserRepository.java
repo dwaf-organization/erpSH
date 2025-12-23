@@ -64,4 +64,30 @@ public interface CustomerUserRepository extends JpaRepository<CustomerUser, Inte
      */
     @Query(value = "SELECT c.virtual_account FROM customer c WHERE c.customer_code = :customerCode", nativeQuery = true)
     String findVirtualAccountByCustomerCode(@Param("customerCode") Integer customerCode);
+    
+    /**
+     * ✅ 거래처사용자의 장바구니 데이터 개수 조회
+     */
+    @Query(value = "SELECT COUNT(*) FROM customer_cart " +
+           "WHERE customer_code = :customerCode " +
+           "AND customer_user_code = :customerUserCode", nativeQuery = true)
+    Long countCartByCustomerUser(@Param("customerUserCode") Integer customerUserCode, 
+                                @Param("customerCode") Integer customerCode);
+    
+    /**
+     * ✅ 거래처사용자의 위시리스트 데이터 개수 조회
+     */
+    @Query(value = "SELECT COUNT(*) FROM customer_wishlist " +
+           "WHERE customer_code = :customerCode " +
+           "AND customer_user_code = :customerUserCode", nativeQuery = true)
+    Long countWishlistByCustomerUser(@Param("customerUserCode") Integer customerUserCode, 
+                                    @Param("customerCode") Integer customerCode);
+    
+    /**
+     * ✅ 거래처사용자의 주문내역 개수 조회 (필요시 사용)
+     */
+    @Query(value = "SELECT COUNT(*) FROM order_table o " +
+           "JOIN customer_user cu ON o.customer_code = cu.customer_code " +
+           "WHERE cu.customer_user_code = :customerUserCode", nativeQuery = true)
+    Long countOrdersByCustomerUser(@Param("customerUserCode") Integer customerUserCode);
 }

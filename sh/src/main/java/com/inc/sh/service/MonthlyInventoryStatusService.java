@@ -58,6 +58,7 @@ public class MonthlyInventoryStatusService {
                             .actualAmount(((Number) result[15]).intValue())
                             .diffQuantity(((Number) result[16]).intValue())
                             .diffAmount(((Number) result[17]).intValue())
+                            .warehouseName(((String) result[18]))
                             .build())
                     .collect(Collectors.toList());
             

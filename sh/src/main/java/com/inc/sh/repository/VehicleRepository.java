@@ -47,7 +47,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Integer> {
            "(:vehicleCode IS NULL OR v.vehicleCode = :vehicleCode) AND " +
            "(:category IS NULL OR :category = '' OR v.category = :category) AND " +
            "v.hqCode = :hqCode " +
-           "ORDER BY v.vehicleCode ASC")
+           "ORDER BY v.vehicleCode DESC")
     List<Vehicle> findBySearchConditionsWithHqCode(
         @Param("vehicleCode") Integer vehicleCode,
         @Param("category") String category,

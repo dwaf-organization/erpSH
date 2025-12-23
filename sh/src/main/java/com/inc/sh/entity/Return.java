@@ -21,6 +21,12 @@ public class Return {
     @Column(name = "return_customer_code", nullable = false)
     private Integer returnCustomerCode;
     
+    @Column(name = "order_no", length = 250, nullable = false)
+    private String orderNo;
+    
+    @Column(name = "order_item_code", nullable = false)
+    private Integer orderItemCode;
+
     @Column(name = "item_code", nullable = false)
     private Integer itemCode;
     
@@ -82,12 +88,6 @@ public class Return {
     
     @Column(name = "description", length = 250)
     private String description;
-    
-    @Column(name = "order_item_code", nullable = false)
-    private Integer orderItemCode;
-    
-    @Column(name = "order_no", length = 250, nullable = false)
-    private String orderNo;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

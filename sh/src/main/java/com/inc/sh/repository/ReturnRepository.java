@@ -352,7 +352,8 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
            "r.note, " +                           // 21
            "r.return_message, " +                 // 22
            "r.warehouse_name as stored_warehouse_name, " +  // 23
-           "r.order_no as order_no " +            // 24
+           "r.order_no as order_no, " +            // 24
+           "r.unit_price " +            // 25
            "FROM `return` r " +
            "LEFT JOIN customer c ON r.return_customer_code = c.customer_code " +
            "LEFT JOIN warehouse w ON r.receive_warehouse_code = w.warehouse_code " +

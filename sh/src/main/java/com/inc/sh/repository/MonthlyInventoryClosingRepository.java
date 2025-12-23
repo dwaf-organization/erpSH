@@ -233,7 +233,10 @@ public interface MonthlyInventoryClosingRepository extends JpaRepository<Monthly
            "WHERE mic.closing_ym = :closingYm " +
            "AND (:warehouseCode IS NULL OR mic.warehouse_code = :warehouseCode) " +
            "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
-           "AND (:itemSearch IS NULL OR mic.item_code LIKE CONCAT('%', :itemSearch, '%')) " +
+           "AND (:itemSearch IS NULL OR " +
+           "    CAST(mic.item_code AS CHAR) LIKE CONCAT('%', :itemSearch, '%') OR " +
+           "    i.item_name LIKE CONCAT('%', :itemSearch, '%')" +
+           ") " +
            "ORDER BY mic.warehouse_code, ic1.category_code, mic.item_code", nativeQuery = true)
     List<Object[]> findMonthlyInventoryStatusByConditions(
         @Param("closingYm") String closingYm,
@@ -266,7 +269,8 @@ public interface MonthlyInventoryClosingRepository extends JpaRepository<Monthly
            "mic.actual_unit_price, " +
            "mic.actual_amount, " +
            "mic.diff_quantity, " +
-           "mic.diff_amount " +
+           "mic.diff_amount, " +
+           "w.warehouse_name " +
            "FROM monthly_inventory_closing mic " +
            "JOIN item i ON mic.item_code = i.item_code " +
            "JOIN warehouse w ON mic.warehouse_code = w.warehouse_code " +
@@ -275,7 +279,10 @@ public interface MonthlyInventoryClosingRepository extends JpaRepository<Monthly
            "WHERE mic.closing_ym = :closingYm " +
            "AND (:warehouseCode IS NULL OR mic.warehouse_code = :warehouseCode) " +
            "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
-           "AND (:itemSearch IS NULL OR mic.item_code LIKE CONCAT('%', :itemSearch, '%')) " +
+           "AND (:itemSearch IS NULL OR " +
+           "    CAST(mic.item_code AS CHAR) LIKE CONCAT('%', :itemSearch, '%') OR " +
+           "    i.item_name LIKE CONCAT('%', :itemSearch, '%')" +
+           ") " +
            "AND w.hq_code = :hqCode " +
            "ORDER BY mic.warehouse_code, ic1.category_code, mic.item_code", nativeQuery = true)
     List<Object[]> findMonthlyInventoryStatusByConditionsWithHqCode(

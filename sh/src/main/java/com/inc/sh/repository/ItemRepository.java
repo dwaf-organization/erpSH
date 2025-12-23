@@ -199,6 +199,7 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
            "     i.item_name LIKE CONCAT('%', :item, '%')) " +
            "AND (:categoryCode IS NULL OR i.category_code = :categoryCode) " +
            "AND (:priceType IS NULL OR i.price_type = :priceType) " +
+           "AND i.end_dt IS NULL " +
            "AND i.order_available_yn = 1 " +  // 주문가능 품목만
            "ORDER BY i.item_code ASC", nativeQuery = true)
     List<Item> findByPopupSearchConditions(

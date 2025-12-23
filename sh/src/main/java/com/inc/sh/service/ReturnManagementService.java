@@ -9,6 +9,7 @@ import com.inc.sh.dto.returnManagement.respDto.ReturnBatchResult;
 import com.inc.sh.dto.returnManagement.respDto.ReturnRespDto;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.entity.Customer;
+import com.inc.sh.entity.CustomerAccountTransactions;
 import com.inc.sh.entity.InventoryTransactions;
 import com.inc.sh.entity.Item;
 import com.inc.sh.entity.MonthlyInventoryClosing;
@@ -17,6 +18,7 @@ import com.inc.sh.entity.OrderItem;
 import com.inc.sh.entity.Return;
 import com.inc.sh.entity.Warehouse;
 import com.inc.sh.entity.WarehouseItems;
+import com.inc.sh.repository.CustomerAccountTransactionsRepository;
 import com.inc.sh.repository.CustomerRepository;
 import com.inc.sh.repository.InventoryTransactionsRepository;
 import com.inc.sh.repository.ItemRepository;
@@ -55,6 +57,9 @@ public class ReturnManagementService {
     private final WarehouseItemsRepository warehouseItemsRepository;
     private final MonthlyInventoryClosingRepository monthlyInventoryClosingRepository;
     private final InventoryTransactionsRepository inventoryTransactionsRepository;
+    
+    // 금융처리를 위한 의존성 추가
+    private final CustomerAccountTransactionsRepository customerAccountTransactionsRepository;
     
     /**
      * 반품 조회
@@ -99,6 +104,7 @@ public class ReturnManagementService {
                                 .message((String) result[20])
                                 .note((String) result[21])
                                 .orderNo((String) result[24])
+                                .unitPrice((Integer) result[25])
                                 .build();
                         return dto;
                     })
@@ -241,8 +247,11 @@ public class ReturnManagementService {
             returnEntity = Return.builder()
                     .returnNo(returnNo)
                     .returnCustomerCode(saveDto.getReturnCustomerCode())
+                    .orderNo(saveDto.getOrderNo())
+                    .orderItemCode(saveDto.getOrderItemCode())
                     .itemCode(saveDto.getItemCode())
                     .receiveWarehouseCode(saveDto.getReceiveWarehouseCode())
+                    .warehouseName(saveDto.getWarehouseName())
                     .returnCustomerName(saveDto.getReturnCustomerName() != null ? saveDto.getReturnCustomerName() : customer.getCustomerName())
                     .returnRequestDt(saveDto.getReturnRequestDt())
                     .itemName(saveDto.getItemName() != null ? saveDto.getItemName() : item.getItemName())
@@ -257,9 +266,6 @@ public class ReturnManagementService {
                     .returnMessage(saveDto.getReturnMessage())
                     .note(saveDto.getNote())
                     .progressStatus(saveDto.getProgressStatus() != null ? saveDto.getProgressStatus() : "미승인")
-                    .warehouseName(saveDto.getWarehouseName())
-                    .orderItemCode(saveDto.getOrderItemCode())
-                    .orderNo(saveDto.getOrderNo())
                     .build();
             
             returnEntity = returnRepository.save(returnEntity);
@@ -478,14 +484,16 @@ public class ReturnManagementService {
                         continue;
                     }
                     
-                    // ✅ 승인처리시 재고 업데이트
+                    // ✅ 승인처리시 재고 업데이트 및 금융처리
                     if ("승인".equals(approvalDto.getApprovalAction())) {
                         processReturnApprovalInventory(returnEntity, currentDate, currentYm);
+                        processReturnApprovalPayment(returnEntity, currentDate); // 금융처리 추가
                     }
                     
-                    // ✅ 미승인으로 되돌릴 때 재고 롤백
+                    // ✅ 미승인으로 되돌릴 때 재고 롤백 및 금융 롤백
                     if ("미승인".equals(approvalDto.getApprovalAction()) && "승인".equals(returnEntity.getProgressStatus())) {
                         rollbackReturnApprovalInventory(returnEntity, currentDate, currentYm);
+                        rollbackReturnApprovalPayment(returnEntity, currentDate); // 금융롤백 추가
                     }
                     
                     // 반품 상태 업데이트
@@ -708,5 +716,97 @@ public class ReturnManagementService {
                 .itemName("알 수 없음")
                 .errorMessage(errorMessage)
                 .build();
+    }
+    
+    /**
+     * ✅ 반품승인시 금융처리 (모든 거래처 처리)
+     */
+    private void processReturnApprovalPayment(Return returnEntity, String currentDate) {
+        try {
+            // 1. 거래처 조회
+            Customer customer = customerRepository.findByCustomerCode(returnEntity.getReturnCustomerCode());
+            if (customer == null) {
+                log.warn("거래처를 찾을 수 없어 금융처리를 스킵합니다 - customerCode: {}", returnEntity.getReturnCustomerCode());
+                return;
+            }
+            
+            // 2. 거래처 잔액 증가 (반품금액만큼 환불) - 충전형/후입금 구분없이 처리
+            Integer refundAmount = returnEntity.getTotalAmt() != null ? returnEntity.getTotalAmt() : 0;
+            customer.setBalanceAmt(customer.getBalanceAmt() + refundAmount);
+            customerRepository.save(customer);
+            
+            // 3. 거래처계좌내역 생성
+            CustomerAccountTransactions transaction = CustomerAccountTransactions.builder()
+                    .customerCode(returnEntity.getReturnCustomerCode())
+                    .virtualAccountCode(customer.getVirtualAccountCode())
+                    .transactionDate(currentDate)
+                    .transactionType("입금") // 반품승인 = 고객에게 환불 = 입금
+                    .amount(refundAmount)
+                    .balanceAfter(customer.getBalanceAmt())
+                    .referenceType("반품")
+                    .referenceId(returnEntity.getReturnNo())
+                    .note("반품승인 환불 - " + returnEntity.getItemName())
+                    .description("반품승인처리")
+                    .build();
+            
+            customerAccountTransactionsRepository.save(transaction);
+            
+            log.info("반품승인 금융처리 완료 - customerCode: {}, 환불금액: {}, 잔액: {}", 
+                    returnEntity.getReturnCustomerCode(), refundAmount, customer.getBalanceAmt());
+            
+        } catch (Exception e) {
+            log.error("반품승인 금융처리 중 오류 발생 - customerCode: {}", returnEntity.getReturnCustomerCode(), e);
+            throw new RuntimeException("반품승인 금융처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ 반품승인 롤백시 금융처리 (모든 거래처 처리)
+     */
+    private void rollbackReturnApprovalPayment(Return returnEntity, String currentDate) {
+        try {
+            // 1. 거래처 조회
+            Customer customer = customerRepository.findByCustomerCode(returnEntity.getReturnCustomerCode());
+            if (customer == null) {
+                log.warn("거래처를 찾을 수 없어 금융롤백을 스킵합니다 - customerCode: {}", returnEntity.getReturnCustomerCode());
+                return;
+            }
+            
+            Integer rollbackAmount = returnEntity.getTotalAmt() != null ? returnEntity.getTotalAmt() : 0;
+            
+            // 2. 잔액 부족 체크
+            if (customer.getBalanceAmt() < rollbackAmount) {
+                throw new RuntimeException(String.format(
+                    "잔액 부족으로 반품승인을 취소할 수 없습니다. 현재잔액: %d, 필요금액: %d", 
+                    customer.getBalanceAmt(), rollbackAmount));
+            }
+            
+            // 3. 거래처 잔액 감소 (환불했던 금액 회수)
+            customer.setBalanceAmt(customer.getBalanceAmt() - rollbackAmount);
+            customerRepository.save(customer);
+            
+            // 4. 거래처계좌내역 생성
+            CustomerAccountTransactions transaction = CustomerAccountTransactions.builder()
+                    .customerCode(returnEntity.getReturnCustomerCode())
+                    .virtualAccountCode(customer.getVirtualAccountCode())
+                    .transactionDate(currentDate)
+                    .transactionType("출금") // 승인취소 = 환불금액 회수 = 출금
+                    .amount(rollbackAmount)
+                    .balanceAfter(customer.getBalanceAmt())
+                    .referenceType("반품취소")
+                    .referenceId(returnEntity.getReturnNo())
+                    .note("반품승인취소 - " + returnEntity.getItemName())
+                    .description("반품승인취소처리")
+                    .build();
+            
+            customerAccountTransactionsRepository.save(transaction);
+            
+            log.info("반품승인 금융롤백 완료 - customerCode: {}, 회수금액: {}, 잔액: {}", 
+                    returnEntity.getReturnCustomerCode(), rollbackAmount, customer.getBalanceAmt());
+            
+        } catch (Exception e) {
+            log.error("반품승인 금융롤백 중 오류 발생 - customerCode: {}", returnEntity.getReturnCustomerCode(), e);
+            throw new RuntimeException("반품승인 금융롤백 중 오류가 발생했습니다: " + e.getMessage());
+        }
     }
 }

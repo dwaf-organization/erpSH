@@ -10,6 +10,7 @@ import lombok.*;
 public class MonthlyInventoryStatusRespDto {
     
     private Integer warehouseCode;      // 창고코드
+    private String warehouseName;       // 창고명
     private String categoryName;        // 분류명 (대분류명 또는 대분류명-중분류명)
     private Integer itemCode;           // 품목코드
     private String itemName;            // 품명

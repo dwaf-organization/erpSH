@@ -25,6 +25,7 @@ public class ReturnRespDto {
     private String specification;           // 규격
     private String unit;                    // 단위
     private String priceType;               // 단가유형
+    private Integer unitPrice;              // 납품단가
     
     // 수량/금액정보
     private Integer quantity;               // 수량

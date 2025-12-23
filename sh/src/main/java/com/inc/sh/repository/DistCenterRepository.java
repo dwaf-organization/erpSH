@@ -59,7 +59,7 @@ public interface DistCenterRepository extends JpaRepository<DistCenter, Integer>
            "(:distCenterCode IS NULL OR dc.distCenterCode = :distCenterCode) AND " +
            "(:useYn IS NULL OR dc.useYn = :useYn) AND " +
            "dc.hqCode = :hqCode " +
-           "ORDER BY dc.distCenterCode ASC")
+           "ORDER BY dc.distCenterCode DESC")
     List<DistCenter> findBySearchConditionsWithHqCode(
         @Param("distCenterCode") Integer distCenterCode,
         @Param("useYn") Integer useYn,

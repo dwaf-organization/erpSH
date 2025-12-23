@@ -55,7 +55,7 @@ public class CustomerUserService {
                             .contactNum((String) result[5])
                             .email((String) result[6])
                             .endYn((Integer) result[7])
-                            .customerUserPw((String) result[8]) // 조회 시에도 표시
+                            .customerUserPw(null) // 조회 시에도 표시
                             .build())
                     .collect(Collectors.toList());
             
@@ -311,7 +311,7 @@ public class CustomerUserService {
     }
     
     /**
-     * 개별 거래처사용자 삭제 처리
+     * 개별 거래처사용자 삭제 처리 (✅ FK 제약조건 체크 + 소프트 삭제)
      */
     private CustomerUserBatchResult.CustomerUserSuccessResult deleteSingleCustomerUser(Integer customerUserCode) {
         CustomerUser customerUser = customerUserRepository.findByCustomerUserCode(customerUserCode);
@@ -322,7 +322,9 @@ public class CustomerUserService {
         String customerUserId = customerUser.getCustomerUserId();
         String customerUserName = customerUser.getCustomerUserName();
         Integer customerCode = customerUser.getCustomerCode();
-        Integer endYn = customerUser.getEndYn();
+        
+        // ✅ FK 제약조건 체크 (삭제 전 관련 데이터 확인)
+        checkForeignKeyConstraints(customerUserCode, customerCode);
         
         // 거래처명 조회 (Optional)
         String customerName = null;
@@ -336,7 +338,12 @@ public class CustomerUserService {
             log.warn("거래처명 조회 실패", e);
         }
         
-        customerUserRepository.delete(customerUser);
+        // ✅ 소프트 삭제: end_yn = 1로 변경 (하드 삭제 대신)
+        customerUser.setEndYn(1); // 사용 중지
+        customerUserRepository.save(customerUser);
+        
+        log.info("거래처사용자 사용중지 처리 완료 - customerUserCode: {}, userId: {}", 
+                customerUserCode, customerUserId);
         
         return CustomerUserBatchResult.CustomerUserSuccessResult.builder()
                 .customerUserCode(customerUserCode)
@@ -344,8 +351,69 @@ public class CustomerUserService {
                 .customerName(customerName)
                 .customerUserId(customerUserId)
                 .customerUserName(customerUserName)
-                .endYn(endYn)
-                .message("삭제 완료")
+                .endYn(1) // 사용중지 상태
+                .message("사용중지 처리 완료")
                 .build();
+    }
+    
+    /**
+     * ✅ FK 제약조건 체크 (관련 데이터 존재 확인)
+     */
+    private void checkForeignKeyConstraints(Integer customerUserCode, Integer customerCode) {
+        try {
+            // 1. 장바구니 데이터 존재 체크
+            boolean hasCartData = checkCartData(customerUserCode, customerCode);
+            if (hasCartData) {
+                throw new RuntimeException("장바구니에 데이터가 존재하여 삭제할 수 없습니다.");
+            }
+            
+            // 2. 위시리스트 데이터 존재 체크  
+            boolean hasWishlistData = checkWishlistData(customerUserCode, customerCode);
+            if (hasWishlistData) {
+                throw new RuntimeException("위시리스트에 데이터가 존재하여 삭제할 수 없습니다.");
+            }
+            
+            // 3. 기타 관련 테이블 체크 (필요시 추가)
+            // boolean hasOrderData = checkOrderData(customerUserCode, customerCode);
+            // if (hasOrderData) {
+            //     throw new RuntimeException("주문내역이 존재하여 삭제할 수 없습니다.");
+            // }
+            
+        } catch (RuntimeException e) {
+            // 명시적으로 던진 에러는 그대로 전파
+            throw e;
+        } catch (Exception e) {
+            log.error("FK 제약조건 체크 중 오류 발생 - customerUserCode: {}", customerUserCode, e);
+            throw new RuntimeException("관련 데이터 확인 중 오류가 발생했습니다.");
+        }
+    }
+    
+    /**
+     * ✅ 장바구니 데이터 존재 체크
+     */
+    private boolean checkCartData(Integer customerUserCode, Integer customerCode) {
+        try {
+            // customer_cart 테이블에서 해당 사용자의 데이터 존재 확인
+            // Repository에 메서드가 없다면 간단한 카운트 쿼리로 확인
+            Long cartCount = customerUserRepository.countCartByCustomerUser(customerUserCode, customerCode);
+            return cartCount != null && cartCount > 0;
+        } catch (Exception e) {
+            log.warn("장바구니 데이터 확인 중 오류 - customerUserCode: {}", customerUserCode, e);
+            return false; // 에러시 안전하게 false 반환
+        }
+    }
+    
+    /**
+     * ✅ 위시리스트 데이터 존재 체크
+     */
+    private boolean checkWishlistData(Integer customerUserCode, Integer customerCode) {
+        try {
+            // customer_wishlist 테이블에서 해당 사용자의 데이터 존재 확인
+            Long wishlistCount = customerUserRepository.countWishlistByCustomerUser(customerUserCode, customerCode);
+            return wishlistCount != null && wishlistCount > 0;
+        } catch (Exception e) {
+            log.warn("위시리스트 데이터 확인 중 오류 - customerUserCode: {}", customerUserCode, e);
+            return false; // 에러시 안전하게 false 반환
+        }
     }
 }

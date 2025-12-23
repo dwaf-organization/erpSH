@@ -14,7 +14,7 @@ public interface BrandRepository extends JpaRepository<BrandInfo, Integer> {
     BrandInfo findByBrandCode(Integer brandCode);
     
     // 본사코드로 전체 조회
-    List<BrandInfo> findByHqCode(Integer hqCode);
+    List<BrandInfo> findByHqCodeOrderByBrandCodeDesc(Integer hqCode);
     
     // 본사코드와 브랜드코드로 조회
     Optional<BrandInfo> findByHqCodeAndBrandCode(Integer hqCode, Integer brandCode);

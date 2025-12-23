@@ -8,12 +8,20 @@ import com.inc.sh.dto.returnRegistration.reqDto.AppReturnHistoryReqDto;
 import com.inc.sh.dto.returnRegistration.respDto.AppReturnHistoryRespDto;
 import com.inc.sh.dto.returnRegistration.respDto.AppReturnCancelRespDto;
 import com.inc.sh.dto.returnRegistration.respDto.AppReturnHistoryListRespDto;
+import com.inc.sh.entity.Customer;
 import com.inc.sh.entity.Order;
 import com.inc.sh.entity.OrderItem;
+import com.inc.sh.entity.OrderItemReturnStatus;
 import com.inc.sh.entity.Return;
+import com.inc.sh.entity.Warehouse;
 import com.inc.sh.repository.OrderRepository;
+import com.inc.sh.repository.CustomerRepository;
+import com.inc.sh.repository.DistCenterRepository;
 import com.inc.sh.repository.OrderItemRepository;
+import com.inc.sh.repository.OrderItemReturnStatusRepository;
 import com.inc.sh.repository.ReturnRepository;
+import com.inc.sh.repository.WarehouseRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,23 +39,26 @@ public class AppReturnService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ReturnRepository returnRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final CustomerRepository customerRepository;
+    private final DistCenterRepository distCenterRepository;
+    
+    // ✅ 반품가능 주문품목 뷰 조회용 Repository 추가
+    private final OrderItemReturnStatusRepository orderItemReturnStatusRepository;
     
     /**
-     * [앱] 반품가능한 주문번호 조회
+     * [앱] 반품가능한 주문번호 조회 (✅ 뷰 사용)
      */
     public RespDto<List<String>> getAvailableOrders(Integer customerCode) {
         try {
-            // 1달 전 날짜 계산
-            String oneMonthAgo = LocalDate.now().minusMonths(1).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            log.info("[앱] 반품가능 주문번호 조회 시작 - customerCode: {}", customerCode);
             
-            // 반품가능 주문번호 조회
-            List<String> orderNumbers = orderRepository.findReturnableOrderNumbers(
-                    customerCode, 
-                    oneMonthAgo, 
-                    today);
+            // ✅ 뷰에서 반품가능한 주문번호 직접 조회
+            List<String> orderNumbers = orderItemReturnStatusRepository
+                    .findAvailableOrderNumbers(customerCode);
             
-            log.info("[앱] 반품가능 주문번호 조회 완료 - customerCode: {}, 조회건수: {}", customerCode, orderNumbers.size());
+            log.info("[앱] 반품가능 주문번호 조회 완료 - customerCode: {}, 조회건수: {}", 
+                    customerCode, orderNumbers.size());
             
             return RespDto.success("반품가능 주문 조회 성공", orderNumbers);
             
@@ -58,7 +69,7 @@ public class AppReturnService {
     }
     
     /**
-     * [앱] 반품가능한 주문품목 조회
+     * [앱] 반품가능한 주문품목 조회 (✅ 뷰 사용)
      */
     public RespDto<List<AppReturnOrderItemRespDto>> getOrderItems(String orderNo, Integer customerCode) {
         try {
@@ -68,12 +79,13 @@ public class AppReturnService {
                 return RespDto.fail("주문번호 또는 거래처코드가 일치하지 않습니다");
             }
             
-            // 2. 주문품목 조회
-            List<OrderItem> orderItems = orderItemRepository.findByOrderNo(orderNo);
+            // ✅ 2. 뷰에서 반품가능한 주문품목 직접 조회
+            List<OrderItemReturnStatus> returnableItems = orderItemReturnStatusRepository
+                    .findByOrderNoAndCustomerCodeOrderByItemCode(orderNo, customerCode);
             
             // 3. DTO 변환
-            List<AppReturnOrderItemRespDto> response = orderItems.stream()
-                    .map(this::convertToOrderItemDto)
+            List<AppReturnOrderItemRespDto> response = returnableItems.stream()
+                    .map(this::convertViewToOrderItemDto)
                     .toList();
             
             log.info("[앱] 반품가능 주문품목 조회 완료 - orderNo: {}, customerCode: {}, 조회건수: {}", 
@@ -122,12 +134,18 @@ public class AppReturnService {
             // 4. 반품번호 생성 (RET-YYYYMMDD-0001 형식)
             String returnNo = generateReturnNo();
             
+            Warehouse warehouse = warehouseRepository.findByWarehouseCode(request.getWarehouseCode());
+            
+            
             // 5. Return 엔티티 생성 (OrderItem 기존 금액으로 수량 비율 계산)
             Return returnEntity = Return.builder()
                     .returnNo(returnNo)
                     .returnCustomerCode(request.getCustomerCode())
+                    .orderNo(request.getOrderNo())
+                    .orderItemCode(request.getOrderItemCode())
                     .itemCode(request.getItemCode())
                     .receiveWarehouseCode(request.getWarehouseCode())
+                    .warehouseName(warehouse.getWarehouseName())
                     .returnCustomerName(order.getCustomerName())
                     .returnRequestDt(today)
                     .itemName(orderItem.getItemName())
@@ -145,7 +163,10 @@ public class AppReturnService {
             
             returnRepository.save(returnEntity);
             
-            // 6. 응답 데이터 생성
+            // ✅ 6. order_item.returned_qty 업데이트 (반품신청 즉시 반영)
+            orderItemRepository.updateReturnedQty(request.getOrderItemCode(), request.getReturnQty());
+            
+            // 7. 응답 데이터 생성
             AppReturnRequestRespDto response = AppReturnRequestRespDto.builder()
                     .returnNo(returnNo)
                     .returnMessage("반품신청이 완료되었습니다")
@@ -228,7 +249,64 @@ public class AppReturnService {
     }
     
     /**
-     * OrderItem -> AppReturnOrderItemRespDto 변환
+     * ✅ OrderItemReturnStatus(뷰) -> AppReturnOrderItemRespDto 변환
+     */
+    private AppReturnOrderItemRespDto convertViewToOrderItemDto(OrderItemReturnStatus viewItem) {
+        // 실제 OrderItem에서 추가 정보 조회 (필요한 필드들)
+        OrderItem orderItem = orderItemRepository.findByOrderItemCode(viewItem.getOrderItemCode());
+        
+        // 창고명 조회
+        String warehouseName = null;
+        if (orderItem != null && orderItem.getReleaseWarehouseCode() != null) {
+            warehouseName = warehouseRepository.findById(orderItem.getReleaseWarehouseCode())
+                    .map(warehouse -> warehouse.getWarehouseName())
+                    .orElse(null);
+        }
+        
+        // 거래처로부터 물류센터 정보 조회
+        Integer distCenterCode = null;
+        String distCenterName = null;
+        if (viewItem.getCustomerCode() != null) {
+            Customer customer = customerRepository.findByCustomerCode(viewItem.getCustomerCode());
+            if (customer != null && customer.getDistCenterCode() != null) {
+                distCenterCode = customer.getDistCenterCode();
+                distCenterName = distCenterRepository.findById(distCenterCode)
+                        .map(distCenter -> distCenter.getDistCenterName())
+                        .orElse(null);
+            }
+        }
+        
+        return AppReturnOrderItemRespDto.builder()
+                .customerCode(viewItem.getCustomerCode())
+                .customerName(viewItem.getCustomerName())
+                .orderItemCode(viewItem.getOrderItemCode())
+                .orderNo(viewItem.getOrderNo())
+                .itemCode(viewItem.getItemCode())
+                .releaseWarehouseCode(orderItem != null ? orderItem.getReleaseWarehouseCode() : null)
+                .itemName(viewItem.getItemName())
+                .specification(orderItem != null ? orderItem.getSpecification() : null)
+                .unit(orderItem != null ? orderItem.getUnit() : null)
+                .priceType(orderItem != null ? orderItem.getPriceType() : null)
+                .orderUnitPrice(orderItem != null ? orderItem.getOrderUnitPrice() : null)
+                .currentStockQty(orderItem != null ? orderItem.getCurrentStockQty() : null)
+                .orderQty(viewItem.getOrderQty()) // 뷰에서 가져옴
+                .taxTarget(orderItem != null ? orderItem.getTaxTarget() : null)
+                .warehouseName(warehouseName)
+                .taxableAmt(orderItem != null ? orderItem.getTaxableAmt() : null)
+                .taxFreeAmt(orderItem != null ? orderItem.getTaxFreeAmt() : null)
+                .supplyAmt(orderItem != null ? orderItem.getSupplyAmt() : null)
+                .vatAmt(orderItem != null ? orderItem.getVatAmt() : null)
+                .totalAmt(orderItem != null ? orderItem.getTotalAmt() : null)
+                .totalQty(orderItem != null ? orderItem.getTotalQty() : null)
+                // ✅ 물류센터 정보 추가 (AppReturnOrderItemRespDto에 필드가 있다면)
+                .distCenterCode(distCenterCode)
+                .distCenterName(distCenterName)
+                .availableReturnQty(viewItem.getAvailableReturnQty())
+                .build();
+    }
+    
+    /**
+     * OrderItem -> AppReturnOrderItemRespDto 변환 (기존 메서드 유지)
      */
     private AppReturnOrderItemRespDto convertToOrderItemDto(OrderItem orderItem) {
         return AppReturnOrderItemRespDto.builder()
@@ -275,16 +353,20 @@ public class AppReturnService {
     }
     
     /**
-     * 반품번호 생성 (RET-YYYYMMDD-0001 형식) - 임시 구현
+     * 반품번호 생성 (RET + YYYYMMDD + 001 형태)
      */
     private String generateReturnNo() {
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String datePrefix = "RET-" + today + "-";
-        
-        // 임시로 시간 기반 순번 생성 (Repository 메서드 구현 후 수정 필요)
-        int sequence = (int) (System.currentTimeMillis() % 10000);
-        
-        return String.format("%s%04d", datePrefix, sequence);
+        String datePrefix = "RET" + today;
+        String latestReturnNo = returnRepository.findLatestReturnNoByDate(datePrefix);
+
+        int sequence = 1;
+        if (latestReturnNo != null && latestReturnNo.length() >= 14) {
+            String sequencePart = latestReturnNo.substring(11);
+            sequence = Integer.parseInt(sequencePart) + 1;
+        }
+
+        return String.format("%s%03d", datePrefix, sequence);
     }
     
     /**
@@ -311,6 +393,10 @@ public class AppReturnService {
             
             // 4. 미승인 상태인 경우에만 삭제 처리
             if ("미승인".equals(returnEntity.getProgressStatus())) {
+                
+                // ✅ 4-1. order_item.returned_qty 복원 (반품신청했던 수량을 차감)
+                orderItemRepository.updateReturnedQty(returnEntity.getOrderItemCode(), -returnEntity.getQty());
+                
                 returnRepository.delete(returnEntity);
                 
                 // 5. 응답 데이터 생성

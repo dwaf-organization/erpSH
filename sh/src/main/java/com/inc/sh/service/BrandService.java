@@ -42,7 +42,7 @@ public class BrandService {
             
             if (brandCode == 0) {
                 // 전체 조회
-                brands = brandRepository.findByHqCode(hqCode);
+                brands = brandRepository.findByHqCodeOrderByBrandCodeDesc(hqCode);
             } else {
                 // 특정 브랜드 조회
                 BrandInfo brand = brandRepository.findByHqCodeAndBrandCode(hqCode, brandCode)
