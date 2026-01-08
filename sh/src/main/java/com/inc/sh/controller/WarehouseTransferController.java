@@ -100,8 +100,7 @@ public class WarehouseTransferController {
     @PostMapping("/process")
     public ResponseEntity<RespDto<String>> processWarehouseTransfer(@RequestBody WarehouseTransferProcessDto processDto) {
         
-        log.info("창고이송 처리 요청 - 출고창고: {}, 입고창고: {}, 품목수: {}", 
-                processDto.getFromWarehouseCode(), processDto.getToWarehouseCode(),
+        log.info("창고이송 처리 요청 - 총 품목수: {}", 
                 processDto.getItems() != null ? processDto.getItems().size() : 0);
         
         RespDto<String> response = warehouseTransferService.processWarehouseTransfer(processDto);

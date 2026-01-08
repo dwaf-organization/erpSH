@@ -367,7 +367,7 @@ public interface ReturnRepository extends JpaRepository<Return, String> {
            "(:startDate IS NULL OR r.return_request_dt >= :startDate) AND " +
            "(:endDate IS NULL OR r.return_request_dt <= :endDate) AND " +
            "(:customerCode IS NULL OR r.return_customer_code = :customerCode) AND " +
-           "(:status IS NULL OR r.progress_status = :status) AND " +
+           "(:status IS NULL OR :status = '' OR r.progress_status = :status) AND " +
            "o.hq_code = :hqCode " +               // 본사코드 필터링
            "ORDER BY r.return_request_dt DESC, r.return_no DESC", nativeQuery = true)
     List<Object[]> findReturnsWithJoinByConditionsAndHqCode(

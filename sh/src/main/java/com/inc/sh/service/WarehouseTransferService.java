@@ -154,87 +154,169 @@ public class WarehouseTransferService {
     @Transactional
     public RespDto<String> processWarehouseTransfer(WarehouseTransferProcessDto processDto) {
         try {
-            log.info("창고이송 처리 시작 - 출고창고: {}, 입고창고: {}, 품목수: {}", 
-                    processDto.getFromWarehouseCode(), processDto.getToWarehouseCode(),
+            log.info("창고이송 처리 시작 - 총 품목수: {}", 
                     processDto.getItems() != null ? processDto.getItems().size() : 0);
             
-            // 1. 마감 상태 체크
-            String yearMonth = processDto.getTransferDate().substring(0, 6); // YYYYMM
-            String fromClosingMessage = monthlyClosingService.getClosingCheckMessage(
-                    yearMonth, processDto.getFromWarehouseCode());
-            String toClosingMessage = monthlyClosingService.getClosingCheckMessage(
-                    yearMonth, processDto.getToWarehouseCode());
-            
-            if (fromClosingMessage != null) {
-                return RespDto.fail("출고창고가 " + fromClosingMessage);
-            }
-            if (toClosingMessage != null) {
-                return RespDto.fail("입고창고가 " + toClosingMessage);
+            if (processDto.getItems() == null || processDto.getItems().isEmpty()) {
+                return RespDto.fail("이송할 품목이 없습니다.");
             }
             
-            // 2. 재고 수량 체크
+            // 1. 품목별로 개별 처리 (각각 독립적인 이송)
             for (TransferItemDto item : processDto.getItems()) {
-                Optional<WarehouseItems> fromWarehouseItem = warehouseItemsRepository
-                        .findByWarehouseCodeAndItemCode(processDto.getFromWarehouseCode(), item.getItemCode());
-                
-                if (fromWarehouseItem.isEmpty() || fromWarehouseItem.get().getCurrentQuantity() < item.getQuantity()) {
-                    return RespDto.fail("출고창고의 재고가 부족합니다.");
+                try {
+                    processSingleTransfer(item);
+                    log.info("품목 이송 완료 - 품목: {}, 출고창고: {} → 입고창고: {}, 수량: {}", 
+                            item.getItemCode(), item.getFromWarehouseCode(), 
+                            item.getToWarehouseCode(), item.getQuantity());
+                } catch (Exception e) {
+                    log.error("품목 이송 실패 - 품목: {}, 에러: {}", item.getItemCode(), e.getMessage());
+                    return RespDto.fail("품목 " + item.getItemCode() + " 이송 실패: " + e.getMessage());
                 }
             }
             
-            // 3. 이송번호 생성
-            String transferCode = generateTransferCode(processDto.getTransferDate());
-            
-            // 4. 창고이송 기본정보 저장
-            WarehouseTransfers transfer = WarehouseTransfers.builder()
-                    .transferCode(transferCode)
-                    .transferDate(processDto.getTransferDate())
-                    .fromWarehouseCode(processDto.getFromWarehouseCode())
-                    .toWarehouseCode(processDto.getToWarehouseCode())
-                    .note(processDto.getNote())
-                    .description("창고이송")
-                    .build();
-            
-            warehouseTransfersRepository.save(transfer);
-            
-            // 5. 품목별 이송 처리
-            for (TransferItemDto item : processDto.getItems()) {
-                // 5-1. 이송품목 저장
-                WarehouseTransfersItems transferItem = WarehouseTransfersItems.builder()
-                        .transferCode(transferCode)
-                        .itemCode(item.getItemCode())
-                        .quantity(item.getQuantity())
-                        .unitPrice(item.getUnitPrice())
-                        .amount(item.getAmount())
-                        .description("창고이송품목")
-                        .build();
-                
-                warehouseTransfersItemsRepository.save(transferItem);
-                
-                // 5-2. 출고창고 재고 차감
-                updateFromWarehouseQuantity(processDto.getFromWarehouseCode(), item.getItemCode(), 
-                        item.getQuantity());
-                
-                // 5-3. 입고창고 재고 증가
-                updateToWarehouseQuantity(processDto.getToWarehouseCode(), item.getItemCode(), 
-                        item.getQuantity());
-                
-                // 5-4. 월별재고마감 업데이트
-                updateMonthlyInventoryClosing(processDto.getFromWarehouseCode(), processDto.getToWarehouseCode(),
-                        item.getItemCode(), item.getQuantity(), item.getAmount(), yearMonth);
-                
-                // 5-5. 재고수불부 기록
-                createInventoryTransactions(transferCode, processDto.getFromWarehouseCode(), 
-                        processDto.getToWarehouseCode(), item, processDto.getTransferDate());
-            }
-            
-            log.info("창고이송 처리 완료 - 이송번호: {}", transferCode);
-            return RespDto.success("창고이송이 완료되었습니다. 이송번호: " + transferCode, transferCode);
+            log.info("창고이송 처리 완료 - 총 {}건 품목 이송 성공", processDto.getItems().size());
+            return RespDto.success("창고이송이 완료되었습니다. 총 " + processDto.getItems().size() + "건", 
+                    "SUCCESS");
             
         } catch (Exception e) {
             log.error("창고이송 처리 중 오류 발생", e);
             return RespDto.fail("창고이송 처리 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 단일 품목 이송 처리
+     */
+    private void processSingleTransfer(TransferItemDto item) {
+        // 1. 입력값 검증
+        validateTransferItem(item);
+        
+        // 2. 마감 상태 체크
+        String yearMonth = item.getTransferDate().substring(0, 6); // YYYYMM
+        checkClosingStatus(item.getFromWarehouseCode(), item.getToWarehouseCode(), yearMonth);
+        
+        // 3. 재고 수량 체크
+        checkInventoryQuantity(item);
+        
+        // 4. 이송번호 생성
+        String transferCode = generateTransferCode(item.getTransferDate());
+        
+        // 5. 창고이송 기본정보 저장
+        saveWarehouseTransfer(transferCode, item);
+        
+        // 6. 이송품목 저장
+        saveTransferItem(transferCode, item);
+        
+        // 7. 재고 업데이트
+        updateInventories(item);
+        
+        // 8. 재고수불부 기록
+        createInventoryTransactions(transferCode, item.getFromWarehouseCode(), 
+                item.getToWarehouseCode(), item, item.getTransferDate());
+        
+        // 9. 월별재고마감 업데이트
+        updateMonthlyInventoryClosing(item.getFromWarehouseCode(), item.getToWarehouseCode(),
+                item.getItemCode(), item.getQuantity(), item.getAmount(), yearMonth);
+    }
+    
+    /**
+     * 이송 데이터 검증
+     */
+    private void validateTransferItem(TransferItemDto item) {
+        if (item.getFromWarehouseCode() == null) {
+            throw new IllegalArgumentException("출고창고코드는 필수입니다.");
+        }
+        if (item.getToWarehouseCode() == null) {
+            throw new IllegalArgumentException("입고창고코드는 필수입니다.");
+        }
+        if (item.getFromWarehouseCode().equals(item.getToWarehouseCode())) {
+            throw new IllegalArgumentException("출고창고와 입고창고가 동일할 수 없습니다.");
+        }
+        if (item.getItemCode() == null) {
+            throw new IllegalArgumentException("품목코드는 필수입니다.");
+        }
+        if (item.getQuantity() == null || item.getQuantity() <= 0) {
+            throw new IllegalArgumentException("이송수량은 0보다 커야 합니다.");
+        }
+        if (item.getTransferDate() == null || item.getTransferDate().length() != 8) {
+            throw new IllegalArgumentException("이송일자는 YYYYMMDD 형식이어야 합니다.");
+        }
+    }
+    
+    /**
+     * 마감상태 체크
+     */
+    private void checkClosingStatus(Integer fromWarehouseCode, Integer toWarehouseCode, String yearMonth) {
+        String fromClosingMessage = monthlyClosingService.getClosingCheckMessage(yearMonth, fromWarehouseCode);
+        String toClosingMessage = monthlyClosingService.getClosingCheckMessage(yearMonth, toWarehouseCode);
+        
+        if (fromClosingMessage != null) {
+            throw new RuntimeException("출고창고가 " + fromClosingMessage);
+        }
+        if (toClosingMessage != null) {
+            throw new RuntimeException("입고창고가 " + toClosingMessage);
+        }
+    }
+    
+    /**
+     * 재고수량 체크
+     */
+    private void checkInventoryQuantity(TransferItemDto item) {
+        Optional<WarehouseItems> fromWarehouseItem = warehouseItemsRepository
+                .findByWarehouseCodeAndItemCode(item.getFromWarehouseCode(), item.getItemCode());
+        
+        if (fromWarehouseItem.isEmpty()) {
+            throw new RuntimeException("출고창고에 해당 품목이 존재하지 않습니다.");
+        }
+        
+        if (fromWarehouseItem.get().getCurrentQuantity() < item.getQuantity()) {
+            throw new RuntimeException("출고창고의 재고가 부족합니다. 현재고: " + 
+                    fromWarehouseItem.get().getCurrentQuantity() + ", 요청수량: " + item.getQuantity());
+        }
+    }
+    
+    /**
+     * 창고이송 기본정보 저장
+     */
+    private void saveWarehouseTransfer(String transferCode, TransferItemDto item) {
+        WarehouseTransfers transfer = WarehouseTransfers.builder()
+                .transferCode(transferCode)
+                .transferDate(item.getTransferDate())
+                .fromWarehouseCode(item.getFromWarehouseCode())
+                .toWarehouseCode(item.getToWarehouseCode())
+                .note(item.getNote())
+                .description("창고이송")
+                .build();
+        
+        warehouseTransfersRepository.save(transfer);
+        log.debug("창고이송 기본정보 저장 완료 - 이송번호: {}", transferCode);
+    }
+    
+    /**
+     * 이송품목 저장
+     */
+    private void saveTransferItem(String transferCode, TransferItemDto item) {
+        WarehouseTransfersItems transferItem = WarehouseTransfersItems.builder()
+                .transferCode(transferCode)
+                .itemCode(item.getItemCode())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .amount(item.getAmount())
+                .description("창고이송품목")
+                .build();
+        
+        warehouseTransfersItemsRepository.save(transferItem);
+        log.debug("이송품목 저장 완료 - 이송번호: {}, 품목: {}", transferCode, item.getItemCode());
+    }
+    
+    /**
+     * 재고 업데이트 (출고창고 차감 + 입고창고 증가)
+     */
+    private void updateInventories(TransferItemDto item) {
+        // 출고창고 재고 차감
+        updateFromWarehouseQuantity(item.getFromWarehouseCode(), item.getItemCode(), item.getQuantity());
+        // 입고창고 재고 증가
+        updateToWarehouseQuantity(item.getToWarehouseCode(), item.getItemCode(), item.getQuantity());
     }
     
     /**

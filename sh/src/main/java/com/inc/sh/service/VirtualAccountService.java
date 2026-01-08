@@ -167,9 +167,9 @@ public class VirtualAccountService {
         
         if (item.getVirtualAccountCode() == null) {
             // 신규 등록 - 가상계좌번호 중복 체크
-            if (virtualAccountRepository.existsByVirtualAccountNum(item.getVirtualAccountNum())) {
-                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
-            }
+//            if (virtualAccountRepository.existsByVirtualAccountNum(item.getVirtualAccountNum())) {
+//                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
+//            }
             
             virtualAccount = VirtualAccount.builder()
                     .hqCode(item.getHqCode())
@@ -185,10 +185,10 @@ public class VirtualAccountService {
             
         } else {
             // 수정 - 가상계좌번호 중복 체크 (자신 제외)
-            if (virtualAccountRepository.existsByVirtualAccountNumAndVirtualAccountCodeNot(
-                    item.getVirtualAccountNum(), item.getVirtualAccountCode())) {
-                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
-            }
+//            if (virtualAccountRepository.existsByVirtualAccountNumAndVirtualAccountCodeNot(
+//                    item.getVirtualAccountNum(), item.getVirtualAccountCode())) {
+//                throw new RuntimeException("이미 존재하는 가상계좌번호입니다: " + item.getVirtualAccountNum());
+//            }
             
             virtualAccount = virtualAccountRepository.findById(item.getVirtualAccountCode())
                     .orElseThrow(() -> new RuntimeException("존재하지 않는 가상계좌입니다: " + item.getVirtualAccountCode()));
@@ -251,10 +251,10 @@ public class VirtualAccountService {
                 log.info("가상계좌 신규 등록 시작 - virtualAccountNum: {}", request.getVirtualAccountNum());
                 
                 // 가상계좌번호 중복 확인
-                if (virtualAccountRepository.existsByVirtualAccountNum(request.getVirtualAccountNum())) {
-                    log.warn("이미 존재하는 가상계좌번호입니다 - virtualAccountNum: {}", request.getVirtualAccountNum());
-                    return RespDto.fail("이미 존재하는 가상계좌번호입니다.");
-                }
+//                if (virtualAccountRepository.existsByVirtualAccountNum(request.getVirtualAccountNum())) {
+//                    log.warn("이미 존재하는 가상계좌번호입니다 - virtualAccountNum: {}", request.getVirtualAccountNum());
+//                    return RespDto.fail("이미 존재하는 가상계좌번호입니다.");
+//                }
                 
                 VirtualAccount virtualAccount = request.toEntity();
                 savedVirtualAccount = virtualAccountRepository.save(virtualAccount);
@@ -275,11 +275,11 @@ public class VirtualAccountService {
                 previousCustomerCode = existingVirtualAccount.getLinkedCustomerCode();
                 
                 // 가상계좌번호 중복 확인 (자신 제외)
-                VirtualAccount duplicateCheck = virtualAccountRepository.findByVirtualAccountNum(request.getVirtualAccountNum());
-                if (duplicateCheck != null && !duplicateCheck.getVirtualAccountCode().equals(request.getVirtualAccountCode())) {
-                    log.warn("이미 존재하는 가상계좌번호입니다 - virtualAccountNum: {}", request.getVirtualAccountNum());
-                    return RespDto.fail("이미 존재하는 가상계좌번호입니다.");
-                }
+//                VirtualAccount duplicateCheck = virtualAccountRepository.findByVirtualAccountNum(request.getVirtualAccountNum());
+//                if (duplicateCheck != null && !duplicateCheck.getVirtualAccountCode().equals(request.getVirtualAccountCode())) {
+//                    log.warn("이미 존재하는 가상계좌번호입니다 - virtualAccountNum: {}", request.getVirtualAccountNum());
+//                    return RespDto.fail("이미 존재하는 가상계좌번호입니다.");
+//                }
                 
                 request.updateEntity(existingVirtualAccount);
                 savedVirtualAccount = virtualAccountRepository.save(existingVirtualAccount);
