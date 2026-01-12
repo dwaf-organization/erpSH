@@ -8,6 +8,8 @@ import com.inc.sh.common.dto.RespDto;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +34,13 @@ public class PlatformOrderService {
     private final OrderOptionPlatformRepository orderOptionPlatformRepository;
     
     private final ObjectMapper objectMapper;
+    
+    // 테스트용 지연 설정 (운영시 false로 변경)
+    @Value("${platform.sync.delay.enabled:true}")
+    private boolean delayEnabled;
+    
+    @Value("${platform.sync.delay.seconds:120}")
+    private int delaySeconds;
     
     // 하이픈 API 설정
     private static final String HYPHEN_API_URL_BAEMIN = "https://api.hyphen.im/in0022000083";
@@ -62,7 +71,7 @@ public class PlatformOrderService {
             
             // 2. 조회기간 설정 (오늘부터 7일전까지) - YYYYMMDD 형식
             LocalDate today = LocalDate.now();
-            LocalDate sevenDaysAgo = today.minusDays(30);
+            LocalDate sevenDaysAgo = today.minusDays(7);
             String dateFrom = sevenDaysAgo.format(DateTimeFormatter.ofPattern("yyyyMMdd"));  // YYYYMMDD 형식
             String dateTo = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));      // YYYYMMDD 형식
             
@@ -115,6 +124,17 @@ public class PlatformOrderService {
                     log.error("매장 주문내역 동기화 실패 - 매장코드: {}", store.getStorePlatformCode(), e);
                     totalFailed++;
                 }
+                // 테스트용: 매장별 지연 처리 (마지막 매장 제외)
+                if (delayEnabled && baeminStores.indexOf(store) < baeminStores.size() - 1) {
+                    try {
+                        log.info("🕒 테스트용 지연 시작 - {}초 대기 (매장: {})", delaySeconds, store.getPlatformStoreName());
+                        Thread.sleep(delaySeconds * 1000L);
+                        log.info("⏰ 테스트용 지연 완료 - 다음 매장 처리 시작");
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("지연 처리 중단됨");
+                    }
+                }
             }
             
             String resultMessage = String.format("배민 주문내역 동기화 완료 - 성공: %d건, 실패: %d건", 
@@ -150,7 +170,7 @@ public class PlatformOrderService {
             
             // 2. 조회기간 설정 (오늘부터 7일전까지) - YYYYMMDD 형식
             LocalDate today = LocalDate.now();
-            LocalDate sevenDaysAgo = today.minusDays(30);
+            LocalDate sevenDaysAgo = today.minusDays(20);
             String dateFrom = sevenDaysAgo.format(DateTimeFormatter.ofPattern("yyyyMMdd"));  // YYYYMMDD 형식
             String dateTo = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));      // YYYYMMDD 형식
             
@@ -203,6 +223,17 @@ public class PlatformOrderService {
                     log.error("매장 주문내역 동기화 실패 - 매장코드: {}", store.getStorePlatformCode(), e);
                     totalFailed++;
                 }
+                // 테스트용: 매장별 지연 처리 (마지막 매장 제외)
+                if (delayEnabled && yogiyoStores.indexOf(store) < yogiyoStores.size() - 1) {
+                    try {
+                        log.info("🕒 테스트용 지연 시작 - {}초 대기 (매장: {})", delaySeconds, store.getPlatformStoreName());
+                        Thread.sleep(delaySeconds * 1000L);
+                        log.info("⏰ 테스트용 지연 완료 - 다음 매장 처리 시작");
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("지연 처리 중단됨");
+                    }
+                }
             }
             
             String resultMessage = String.format("요기요 주문내역 동기화 완료 - 성공: %d건, 실패: %d건", 
@@ -238,7 +269,7 @@ public class PlatformOrderService {
             
             // 2. 조회기간 설정 (오늘부터 7일전까지) - YYYYMMDD 형식
             LocalDate today = LocalDate.now();
-            LocalDate sevenDaysAgo = today.minusDays(7);
+            LocalDate sevenDaysAgo = today.minusDays(20);
             String dateFrom = sevenDaysAgo.format(DateTimeFormatter.ofPattern("yyyyMMdd"));  // YYYYMMDD 형식
             String dateTo = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));      // YYYYMMDD 형식
             
@@ -290,6 +321,17 @@ public class PlatformOrderService {
                 } catch (Exception e) {
                     log.error("매장 주문내역 동기화 실패 - 매장코드: {}", store.getStorePlatformCode(), e);
                     totalFailed++;
+                }
+                // 테스트용: 매장별 지연 처리 (마지막 매장 제외)
+                if (delayEnabled && coupangStores.indexOf(store) < coupangStores.size() - 1) {
+                    try {
+                        log.info("🕒 테스트용 지연 시작 - {}초 대기 (매장: {})", delaySeconds, store.getPlatformStoreName());
+                        Thread.sleep(delaySeconds * 1000L);
+                        log.info("⏰ 테스트용 지연 완료 - 다음 매장 처리 시작");
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("지연 처리 중단됨");
+                    }
                 }
             }
             

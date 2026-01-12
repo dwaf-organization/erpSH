@@ -37,7 +37,7 @@ public class PlatformIntegratedController {
             executeAndUpdateSummary("배민", hqCode);
             
             // 2분 후 요기요 실행
-            CompletableFuture.delayedExecutor(2, TimeUnit.MINUTES).execute(() -> {
+            CompletableFuture.delayedExecutor(3, TimeUnit.MINUTES).execute(() -> {
                 log.info("2. 요기요 동기화 시작 (2분 후) - 본사: {}", hqCode);
                 executeAndUpdateSummary("요기요", hqCode);
             });
