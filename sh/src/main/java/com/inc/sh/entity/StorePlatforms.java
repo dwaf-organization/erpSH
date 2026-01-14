@@ -56,7 +56,7 @@ public class StorePlatforms {
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
-    private Boolean isActive = true; // 0=비활성화, 1=활성화
+    private Integer isActive = 1; // 0=비활성화, 1=활성화
 
     @Column(name = "last_synced_at", length = 250)
     private String lastSyncedAt;

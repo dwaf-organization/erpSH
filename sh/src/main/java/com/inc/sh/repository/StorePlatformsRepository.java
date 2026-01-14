@@ -38,6 +38,26 @@ public interface StorePlatformsRepository extends JpaRepository<StorePlatforms, 
     StorePlatforms findByCustomerCodeAndPlatformAndIsActiveTrue(Integer customerCode, String platform);
     
     /**
+     * 특정 플랫폼의 특정 거래처 매장 조회
+     */
+    StorePlatforms findByCustomerCodeAndPlatform(Integer customerCode, String platform);
+    
+    
+    /**
+     * 특정 거래처의 특정 플랫폼 정보 하드 딜리트
+     * 
+     * @param customerCode 거래처코드
+     * @param platform 플랫폼
+     * @return 삭제된 행 수
+     */
+    @Modifying
+    @Query("DELETE FROM StorePlatforms sp WHERE sp.customerCode = :customerCode AND sp.platform = :platform")
+    int deleteByCustomerCodeAndPlatform(
+        @Param("customerCode") Integer customerCode, 
+        @Param("platform") String platform
+    );
+    
+    /**
      * 동기화 시간 업데이트
      */
     @Modifying
