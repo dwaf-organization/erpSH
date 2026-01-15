@@ -3,6 +3,7 @@ package com.inc.sh.controller;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.common.respDto.BrandSelectDto;
 import com.inc.sh.dto.common.respDto.DistCenterSelectDto;
+import com.inc.sh.dto.common.respDto.HqSelectDto;
 import com.inc.sh.dto.common.respDto.WarehouseSelectDto;
 import com.inc.sh.dto.common.respDto.ItemCategorySelectDto;
 import com.inc.sh.dto.common.respDto.RoleSelectDto;
@@ -24,6 +25,24 @@ public class CommonController {
 
     private final CommonService commonService;
 
+    /**
+     * 본사 셀렉트박스 목록 조회
+     * GET /api/v1/erp/common/hq-list
+     */
+    @GetMapping("/hq-list")
+    public ResponseEntity<RespDto<List<HqSelectDto>>> getHqSelectList() {
+        
+        log.info("본사 셀렉트박스 목록 조회 요청");
+        
+        RespDto<List<HqSelectDto>> response = commonService.getHqSelectList();
+        
+        if (response.getCode() == 1) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
     /**
      * 브랜드 셀렉트박스 목록 조회
      * GET /api/v1/erp/common/brand-list?hqCode=1
