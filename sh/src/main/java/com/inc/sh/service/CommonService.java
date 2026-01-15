@@ -3,6 +3,7 @@ package com.inc.sh.service;
 import com.inc.sh.common.dto.RespDto;
 import com.inc.sh.dto.common.respDto.BrandSelectDto;
 import com.inc.sh.dto.common.respDto.DistCenterSelectDto;
+import com.inc.sh.dto.common.respDto.HqSelectDto;
 import com.inc.sh.dto.common.respDto.WarehouseSelectDto;
 import com.inc.sh.dto.common.respDto.ItemCategorySelectDto;
 import com.inc.sh.dto.common.respDto.RoleSelectDto;
@@ -10,6 +11,7 @@ import com.inc.sh.dto.common.respDto.VehicleSelectDto;
 import com.inc.sh.dto.common.respDto.OrderSelectDto;
 import com.inc.sh.entity.BrandInfo;
 import com.inc.sh.entity.DistCenter;
+import com.inc.sh.entity.Headquarter;
 import com.inc.sh.entity.Warehouse;
 import com.inc.sh.entity.Vehicle;
 import com.inc.sh.entity.Role;
@@ -43,6 +45,30 @@ public class CommonService {
     private final RoleRepository roleRepository;
     private final OrderRepository orderRepository;
     private final HeadquarterRepository headquarterRepository;
+    
+    /**
+     * 본사 셀렉트박스 목록 조회
+     * @return 본사 목록 (value: 본사코드, label: 본사명)
+     */
+    public RespDto<List<HqSelectDto>> getHqSelectList() {
+        try {
+            log.info("본사 셀렉트박스 목록 조회 시작");
+            
+            List<Headquarter> headquarters = headquarterRepository.findAll();
+            
+            // DTO 변환
+            List<HqSelectDto> selectList = headquarters.stream()
+                    .map(HqSelectDto::fromEntity)
+                    .collect(Collectors.toList());
+            
+            log.info("본사 셀렉트박스 목록 조회 완료 - 조회 건수: {}", selectList.size());
+            return RespDto.success("본사 목록 조회 성공", selectList);
+            
+        } catch (Exception e) {
+            log.error("본사 셀렉트박스 목록 조회 중 오류 발생", e);
+            return RespDto.fail("본사 목록 조회 중 오류가 발생했습니다.");
+        }
+    }
     
     /**
      * 브랜드 셀렉트박스 목록 조회

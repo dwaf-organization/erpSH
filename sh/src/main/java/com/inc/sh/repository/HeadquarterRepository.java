@@ -1,5 +1,6 @@
 package com.inc.sh.repository;
 
+import com.inc.sh.entity.BrandInfo;
 import com.inc.sh.entity.Headquarter;
 
 import java.util.List;
@@ -41,6 +42,9 @@ public interface HeadquarterRepository extends JpaRepository<Headquarter, Intege
      * 본사접속코드로 본사 조회
      */
     Headquarter findByHqAccessCode(@Param("hqAccessCode") String hqAccessCode);
+    
+    // 정렬 없이 전체 조회
+    List<Headquarter> findAll();
     
     /**
      * 관리자 - 본사별 통계 조회 (JOIN + COUNT)
