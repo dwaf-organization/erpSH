@@ -1,5 +1,6 @@
 package com.inc.sh.controller.admin;
 
+import com.inc.sh.dto.user.reqDto.AdminPasswordResetReqDto;
 import com.inc.sh.dto.user.reqDto.AdminUserReqDto;
 import com.inc.sh.dto.user.respDto.AdminUserDetailRespDto;
 import com.inc.sh.dto.user.respDto.AdminUserListRespDto;
@@ -100,4 +101,26 @@ public class AdminUserController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+    
+    /**
+     * 관리자 - 사용자 비밀번호 초기화
+     * POST /api/v1/admin/users/reset-password
+     * 
+     * @param reqDto 비밀번호 초기화 요청
+     * @return 초기화 결과
+     */
+    @PostMapping("/reset-password")
+    public RespDto<String> resetPassword(@Valid @RequestBody AdminPasswordResetReqDto reqDto) {
+        
+        try {
+            log.info("관리자 비밀번호 초기화 API 호출 - userCode: {}", reqDto.getUserCode());
+            
+            return adminUserService.resetPassword(reqDto);
+            
+        } catch (Exception e) {
+            log.error("관리자 비밀번호 초기화 API 오류", e);
+            return RespDto.fail("비밀번호 초기화 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
 }

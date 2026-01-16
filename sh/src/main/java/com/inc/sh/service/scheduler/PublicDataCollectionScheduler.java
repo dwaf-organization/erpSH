@@ -48,7 +48,7 @@ public class PublicDataCollectionScheduler {
         log.info("=== 공공데이터 수집 스케줄러 시작 (운영용 - 매월) ===");
         executeDataCollection("운영");
     }
-    
+    	
     /**
      * 수동 실행용 메서드 (테스트)
      */

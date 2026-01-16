@@ -1,5 +1,6 @@
 package com.inc.sh.service.admin;
 
+import com.inc.sh.dto.user.reqDto.AdminPasswordResetReqDto;
 import com.inc.sh.dto.user.reqDto.AdminUserReqDto;
 import com.inc.sh.dto.user.respDto.AdminUserDetailRespDto;
 import com.inc.sh.dto.user.respDto.AdminUserListRespDto;
@@ -333,5 +334,39 @@ public class AdminUserService {
         }
         
         return String.format("%s%03d", prefix, sequence);
+    }
+    
+    /**
+     * 관리자 - 사용자 비밀번호 초기화
+     */
+    @Transactional
+    public RespDto<String> resetPassword(AdminPasswordResetReqDto reqDto) {
+        try {
+            log.info("관리자 비밀번호 초기화 시작 - userCode: {}", reqDto.getUserCode());
+            
+            // 1. 사용자 존재 확인
+            User user = userRepository.findByUserCode(reqDto.getUserCode());
+            if (user == null) {
+                log.warn("존재하지 않는 사용자 코드 - userCode: {}", reqDto.getUserCode());
+                return RespDto.fail("존재하지 않는 사용자입니다.");
+            }
+            
+            // 2. 초기 비밀번호로 변경
+            String initialPassword = "a1234567";
+            String encodedPassword = passwordEncoder.encode(initialPassword);
+            user.setUserPw(encodedPassword);
+            
+            // 3. 저장
+            userRepository.save(user);
+            
+            log.info("관리자 비밀번호 초기화 완료 - userCode: {}, userName: {}", 
+                    reqDto.getUserCode(), user.getUserName());
+            
+            return RespDto.success("비밀번호가 초기화되었습니다.", "초기화 완료");
+            
+        } catch (Exception e) {
+            log.error("관리자 비밀번호 초기화 중 오류 발생 - userCode: {}", reqDto.getUserCode(), e);
+            return RespDto.fail("비밀번호 초기화 중 오류가 발생했습니다: " + e.getMessage());
+        }
     }
 }
