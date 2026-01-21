@@ -30,7 +30,7 @@ public class CustomerDepositService {
     private final CustomerRepository customerRepository;
     
     /**
-     * 거래처수금처리 조회
+     * 거래처수금처리 조회 (referenceId, balanceAfter 포함)
      */
     @Transactional(readOnly = true)
     public RespDto<List<CustomerDepositRespDto>> getCustomerDepositList(CustomerDepositSearchDto searchDto) {
@@ -39,7 +39,7 @@ public class CustomerDepositService {
                     searchDto.getHqCode(), searchDto.getCustomerCode(), searchDto.getStartDate(), 
                     searchDto.getEndDate(), searchDto.getDepositMethod());
             
-            List<Object[]> results = depositsRepository.findCustomerDepositsWithConditionsWithHqCode(
+            List<Object[]> results = depositsRepository.findCustomerDepositsWithConditionsAndBalanceWithHqCode(
                     searchDto.getCustomerCode(),
                     searchDto.getStartDate(),
                     searchDto.getEndDate(),
@@ -57,6 +57,8 @@ public class CustomerDepositService {
                             .depositMethod((Integer) result[5])
                             .depositorName((String) result[6])
                             .note((String) result[7])
+                            .referenceId((String) result[8])                    // 참조코드 (주문번호)
+                            .balanceAfter(result[9] != null ? ((Number) result[9]).intValue() : null) // 거래 후 잔액
                             .build())
                     .collect(Collectors.toList());
             
@@ -68,6 +70,7 @@ public class CustomerDepositService {
             return RespDto.fail("거래처수금처리 조회 중 오류가 발생했습니다.");
         }
     }
+    
     /**
      * 거래처수금처리 다중 저장 (신규/수정)
      */
@@ -191,12 +194,12 @@ public class CustomerDepositService {
     }
     
     /**
-     * 개별 거래처수금처리 저장 처리 (기존 로직 포함)
+     * 개별 거래처수금처리 저장 처리 (referenceId 포함)
      */
     private CustomerDepositRespDto saveSingleCustomerDeposit(CustomerDepositSaveDto.CustomerDepositItemDto saveDto) {
         
-        log.info("거래처수금처리 저장 시작 - 입금코드: {}, 거래처코드: {}, 입금금액: {}", 
-                saveDto.getDepositId(), saveDto.getCustomerCode(), saveDto.getDepositAmount());
+        log.info("거래처수금처리 저장 시작 - 입금코드: {}, 거래처코드: {}, 입금금액: {}, 참조코드: {}", 
+                saveDto.getDepositId(), saveDto.getCustomerCode(), saveDto.getDepositAmount(), saveDto.getReferenceId());
         
         // 거래처 조회
         Customer customer = customerRepository.findByCustomerCode(saveDto.getCustomerCode());
@@ -237,7 +240,7 @@ public class CustomerDepositService {
             deposit.setDepositMethod(saveDto.getDepositMethod());
             deposit.setDepositorName(saveDto.getDepositorName());
             deposit.setNote(saveDto.getNote());
-            deposit.setDescription("거래처입금수정");
+            deposit.setDescription(saveDto.getReferenceId()); // 참조코드를 description에 저장
         } else {
             deposit = Deposits.builder()
                     .customerCode(saveDto.getCustomerCode())
@@ -247,7 +250,7 @@ public class CustomerDepositService {
                     .depositMethod(saveDto.getDepositMethod())
                     .depositorName(saveDto.getDepositorName())
                     .note(saveDto.getNote())
-                    .description("거래처입금등록")
+                    .description(saveDto.getReferenceId()) // 참조코드를 description에 저장
                     .build();
         }
         
@@ -293,7 +296,8 @@ public class CustomerDepositService {
         customerAccountTransactionsRepository.save(transaction);
         
         String action = isUpdate ? "수정" : "등록";
-        log.info("거래처수금처리 {} 완료 - 입금코드: {}, 최종잔액: {}", action, deposit.getDepositId(), newBalanceAmt);
+        log.info("거래처수금처리 {} 완료 - 입금코드: {}, 참조코드: {}, 최종잔액: {}", 
+                action, deposit.getDepositId(), saveDto.getReferenceId(), newBalanceAmt);
         
         // 응답 DTO 생성
         return CustomerDepositRespDto.builder()
@@ -305,6 +309,8 @@ public class CustomerDepositService {
                 .depositMethod(deposit.getDepositMethod())
                 .depositorName(deposit.getDepositorName())
                 .note(deposit.getNote())
+                .referenceId(deposit.getDescription())  // description에서 참조코드 반환
+                .balanceAfter(newBalanceAmt)             // 거래 후 잔액 반환
                 .build();
     }
     

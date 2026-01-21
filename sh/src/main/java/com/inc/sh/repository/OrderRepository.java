@@ -878,4 +878,126 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         @Param("collectionDate") String collectionDate,
         @Param("hqCode") Integer hqCode
     );
+    
+    /**
+     * 거래명세서 조회 (수금계산 포함)
+     * - 충전형: 당일수금=합계금액, 미수잔액=0
+     * - 후입금: deposit 테이블에서 입금액 계산
+     */
+    @Query(value = "SELECT " +
+           "o.order_no, " +
+           "c.customer_name, " +
+           "c.biz_num, " +
+           "o.supply_amt, " +
+           "o.vat_amt, " +
+           "o.total_amt, " +
+           "o.deposit_type_code, " +
+           // 당일수금 계산
+           "(CASE " +
+           "  WHEN o.deposit_type_code = 1 THEN o.total_amt " +  // 충전형: 전액 선결제
+           "  ELSE COALESCE(deposit_sum.total_deposit, 0) " +     // 후입금: 입금액 합계 (없으면 0)
+           "END) as today_collection, " +
+           // 미수잔액 계산
+           "(CASE " +
+           "  WHEN o.deposit_type_code = 1 THEN 0 " +            // 충전형: 미수잔액 없음
+           "  ELSE o.total_amt - COALESCE(deposit_sum.total_deposit, 0) " + // 후입금: 합계금액 - 입금액
+           "END) as uncollected_balance " +
+           "FROM `order` o " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           // 주문번호별 입금액 합계 계산 (LEFT JOIN으로 입금이 없어도 조회)
+           "LEFT JOIN ( " +
+           "  SELECT d.description as order_no, SUM(d.deposit_amount) as total_deposit " +
+           "  FROM deposits d " +
+           "  WHERE d.description IS NOT NULL AND d.description != '' " +
+           "  GROUP BY d.description " +
+           ") deposit_sum ON o.order_no = deposit_sum.order_no " +
+           "WHERE o.delivery_request_dt = :deliveryRequestDt " +
+           "AND (:customerCode IS NULL OR o.customer_code = :customerCode) " +
+           "AND (:brandCode IS NULL OR c.brand_code = :brandCode) " +
+           "AND o.hq_code = :hqCode " +
+           "ORDER BY o.order_no", nativeQuery = true)
+    List<Object[]> findTransactionStatementWithCollection(
+        @Param("deliveryRequestDt") String deliveryRequestDt,
+        @Param("customerCode") Integer customerCode,
+        @Param("brandCode") Integer brandCode,
+        @Param("hqCode") Integer hqCode
+    );
+
+    /**
+     * 거래명세표용 주문 정보 조회 (모든 관련 정보 포함)
+     */
+    @Query(value = "SELECT " +
+           "o.order_no, " +
+           "o.delivery_request_dt, " +
+           "o.total_amt, " +
+           "o.supply_amt, " +
+           "o.vat_amt, " +
+           "o.deposit_type_code, " +
+           // Customer 정보
+           "c.customer_name, " +
+           "c.biz_num as customer_biz_num, " +
+           "c.owner_name, " +
+           "c.biz_type as customer_biz_type, " +
+           "c.biz_sector, " +
+           "c.addr as customer_addr, " +
+           "c.tel_num as customer_tel, " +
+           // Headquarter 정보
+           "h.company_name, " +
+           "h.biz_num as hq_biz_num, " +
+           "h.ceo_name, " +
+           "h.biz_type as hq_biz_type, " +
+           "h.biz_item, " +
+           "h.addr as hq_addr, " +
+           "h.tel_num as hq_tel, " +
+           // VirtualAccount 정보
+           "va.bank_name, " +
+           "va.virtual_account_num " +
+           "FROM `order` o " +
+           "JOIN customer c ON o.customer_code = c.customer_code " +
+           "JOIN headquarter h ON o.hq_code = h.hq_code " +
+           "LEFT JOIN virtual_account va ON c.virtual_account_code = va.virtual_account_code " +
+           "WHERE o.order_no IN :orderNumbers " +
+           "ORDER BY o.order_no", nativeQuery = true)
+    List<Object[]> findOrderInfoForTransactionStatement(@Param("orderNumbers") List<String> orderNumbers);
+
+    /**
+     * 거래명세표용 주문 상세 항목 조회
+     */
+    @Query(value = "SELECT " +
+           "oi.order_no, " +
+           "oi.item_name, " +
+           "oi.specification, " +
+           "oi.unit, " +
+           "oi.order_qty, " +
+           "oi.order_unit_price, " +
+           "oi.supply_amt, " +
+           "oi.vat_amt, " +
+           "oi.total_amt " +
+           "FROM order_item oi " +
+           "WHERE oi.order_no IN :orderNumbers " +
+           "ORDER BY oi.order_no, oi.order_item_code", nativeQuery = true)
+    List<Object[]> findOrderItemsForTransactionStatement(@Param("orderNumbers") List<String> orderNumbers);
+
+    /**
+     * 거래명세표용 수금 정보 조회 (주문번호별)
+     */
+    @Query(value = "SELECT " +
+           "o.order_no, " +
+           "o.total_amt, " +
+           "o.deposit_type_code, " +
+           // 입금액 계산 (deposits 테이블에서)
+           "COALESCE(deposit_sum.total_deposit, 0) as deposit_amount " +
+           "FROM `order` o " +
+           // 주문번호별 입금액 합계
+           "LEFT JOIN ( " +
+           "  SELECT d.description as order_no, SUM(d.deposit_amount) as total_deposit " +
+           "  FROM deposits d " +
+           "  WHERE d.description IS NOT NULL AND d.description != '' " +
+           "  AND d.description IN :orderNumbers " +
+           "  GROUP BY d.description " +
+           ") deposit_sum ON o.order_no = deposit_sum.order_no " +
+           "WHERE o.order_no IN :orderNumbers " +
+           "ORDER BY o.order_no", nativeQuery = true)
+    List<Object[]> findCollectionInfoForTransactionStatement(@Param("orderNumbers") List<String> orderNumbers);
+    
 }

@@ -56,7 +56,7 @@ public interface DepositsRepository extends JpaRepository<Deposits, Integer> {
     );
 
     /**
-     * 거래처수금처리 조회 (거래처명 포함, 본사별)
+     * 거래처수금처리 조회 (거래처명, 거래후잔액 포함, 본사별)
      */
     @Query(value = "SELECT " +
            "d.deposit_id, " +
@@ -66,9 +66,14 @@ public interface DepositsRepository extends JpaRepository<Deposits, Integer> {
            "d.deposit_amount, " +
            "d.deposit_method, " +
            "d.depositor_name, " +
-           "d.note " +
+           "d.note, " +
+           "d.description as reference_id, " +          // 주문번호 (description에서)
+           "cat.balance_after " +                        // 거래 후 잔액
            "FROM deposits d " +
            "JOIN customer c ON d.customer_code = c.customer_code " +
+           "LEFT JOIN customer_account_transactions cat " +
+           "    ON CAST(d.deposit_id AS CHAR) = cat.reference_id " +
+           "    AND cat.reference_type = '입금확인' " +
            "WHERE (:customerCode IS NULL OR d.customer_code = :customerCode) " +
            "AND d.deposit_date >= :startDate " +
            "AND d.deposit_date <= :endDate " +
@@ -77,7 +82,7 @@ public interface DepositsRepository extends JpaRepository<Deposits, Integer> {
            "        WHEN :depositMethod = 1 THEN c.deposit_type_code = 1 END)) " +
            "AND c.hq_code = :hqCode " +
            "ORDER BY d.deposit_date DESC, d.deposit_id DESC", nativeQuery = true)
-    List<Object[]> findCustomerDepositsWithConditionsWithHqCode(
+    List<Object[]> findCustomerDepositsWithConditionsAndBalanceWithHqCode(
         @Param("customerCode") Integer customerCode,
         @Param("startDate") String startDate,
         @Param("endDate") String endDate,

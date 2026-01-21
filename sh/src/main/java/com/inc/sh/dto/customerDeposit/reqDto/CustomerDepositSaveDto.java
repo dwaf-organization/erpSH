@@ -25,5 +25,6 @@ public class CustomerDepositSaveDto {
         private String depositDate;             // 입금일자 (YYYYMMDD) (필수)
         private Integer depositAmount;          // 입금금액 (필수)
         private String note;                    // 비고
+        private String referenceId;             // 참조코드 (주문번호, 반품번호 등)
     }
 }

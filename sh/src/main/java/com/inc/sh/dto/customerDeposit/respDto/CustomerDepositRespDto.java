@@ -17,4 +17,6 @@ public class CustomerDepositRespDto {
     private Integer depositMethod;       // 입금유형 (0=일반입금, 1=가상계좌)
     private String depositorName;       // 입금자명
     private String note;                // 비고
+    private String referenceId;         // 참조코드 (주문번호, 반품번호 등)
+    private Integer balanceAfter;       // 거래 후 잔액
 }

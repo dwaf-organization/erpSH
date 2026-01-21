@@ -33,14 +33,6 @@ out/
 /nbdist/
 /.nb-gradle/
 
-# YML
-*.yml
-*.yaml
-
-!docker-compose.yml
-!.github/**/*.yml
-!*example.yml
-
 ### VS Code ###
 .vscode/
 *.yml

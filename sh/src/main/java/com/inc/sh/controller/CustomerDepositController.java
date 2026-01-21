@@ -56,7 +56,7 @@ public class CustomerDepositController {
     }
     
     /**
-     * 거래처수금처리 다중 저장 (신규/수정)
+     * 거래처수금처리 다중 저장 (신규/수정) - referenceId 포함
      * POST /api/v1/erp/customer-deposit/save
      */
     @PostMapping("/save")
@@ -89,11 +89,21 @@ public class CustomerDepositController {
                 return ResponseEntity.badRequest()
                         .body(RespDto.fail("입금금액은 0원보다 커야 합니다."));
             }
+            
+            // referenceId 검증 (선택사항이지만 있다면 형식 체크)
+            if (deposit.getReferenceId() != null && deposit.getReferenceId().trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(RespDto.fail("참조코드가 빈 값일 수 없습니다."));
+            }
+            
+            log.info("저장 요청 항목 - 거래처: {}, 금액: {}, 참조코드: {}", 
+                    deposit.getCustomerCode(), deposit.getDepositAmount(), deposit.getReferenceId());
         }
         
         RespDto<CustomerDepositBatchResult> response = customerDepositService.saveCustomerDeposits(request);
         return ResponseEntity.ok(response);
     }
+
     
     /**
      * 거래처수금처리 다중 삭제

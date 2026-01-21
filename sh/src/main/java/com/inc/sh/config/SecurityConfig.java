@@ -24,7 +24,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:8000", "http://localhost:62835", "http://localhost:*", "https://www.sikorder.shop", "https://sikorder.shop", "https://app.sikorder.shop")); // React 개발서버 주소
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:8000", "http://localhost:58120", "http://localhost:*", "https://www.sikorder.shop", "https://sikorder.shop", "https://app.sikorder.shop")); // React 개발서버 주소
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
