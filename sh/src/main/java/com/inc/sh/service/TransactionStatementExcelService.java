@@ -308,7 +308,7 @@ public class TransactionStatementExcelService {
         fillOrderItemsForPageAtRow(sheet, pageItems, (currentPage - 1) * 10, startRow);
         
         // 전체 품목 기준 합계 입력 (모든 페이지에서 동일)
-        fillTotalAndCollectionAtRow(sheet, orderInfo, collectionInfo, startRow);
+        fillTotalAndCollectionAtRow(sheet, orderInfo, collectionInfo, allItems, startRow);
     }
     
     /**
@@ -503,7 +503,8 @@ public class TransactionStatementExcelService {
     /**
      * 특정 행 위치에서 합계 및 수금 정보 입력 (전체 품목 기준)
      */
-    private void fillTotalAndCollectionAtRow(Sheet sheet, Object[] orderInfo, Object[] collectionInfo, int startRow) {
+    private void fillTotalAndCollectionAtRow(Sheet sheet, Object[] orderInfo, Object[] collectionInfo, 
+                                            List<Object[]> allItems, int startRow) {  // ← allItems 파라미터 추가
         Integer totalAmt = ((Number) orderInfo[2]).intValue();          // o.total_amt
         Integer supplyAmt = ((Number) orderInfo[3]).intValue();         // o.supply_amt
         Integer vatAmt = ((Number) orderInfo[4]).intValue();            // o.vat_amt
@@ -527,27 +528,51 @@ public class TransactionStatementExcelService {
             uncollectedBalance = totalAmt - depositAmount;
         }
         
-        // 1번 블록 합계
-        setCellValue(sheet, 6, startRow + 24, null);                   // F24: 수량 합계 (필요시)
-        setCellValue(sheet, 7, startRow + 24, null);                   // G24: 단가 합계 (필요시) 
-        setCellValue(sheet, 8, startRow + 24, supplyAmt);              // H24: 공급가 합계
-        setCellValue(sheet, 9, startRow + 24, vatAmt);                 // I24: 부가세 합계
-        setCellValue(sheet, 10, startRow + 24, totalAmt);              // J24: 합계금액 합계
+        // 전체 품목 수량 합계 계산
+        Integer totalQuantity = calculateTotalQuantityFromItems(allItems);
         
-        setCellValue(sheet, 3, startRow + 26, totalAmt);               // C26: 주문합계
-        setCellValue(sheet, 5, startRow + 26, todayCollection);        // E26: 당일수급
-        setCellValue(sheet, 7, startRow + 26, uncollectedBalance);     // G26: 미수금
+        // 1번 블록 합계
+        setCellValue(sheet, 1, startRow + 24, "소계");              // A24: "소계"
+        setCellValue(sheet, 6, startRow + 24, totalQuantity);       // F24: 전체 수량 합계 ✅
+        setCellValue(sheet, 7, startRow + 24, null);                // G24: 단가 합계 (공백)
+        setCellValue(sheet, 8, startRow + 24, supplyAmt);           // H24: 공급가 합계
+        setCellValue(sheet, 9, startRow + 24, vatAmt);              // I24: 부가세 합계
+        setCellValue(sheet, 10, startRow + 24, totalAmt);           // J24: 합계금액 합계
+        
+        setCellValue(sheet, 3, startRow + 26, totalAmt);            // C26: 주문합계
+        setCellValue(sheet, 5, startRow + 26, todayCollection);     // E26: 당일수급
+        setCellValue(sheet, 7, startRow + 26, uncollectedBalance);  // G26: 미수금
         
         // 2번 블록 합계
-        setCellValue(sheet, 6, startRow + 54, null);                   // F54: 수량 합계
-        setCellValue(sheet, 7, startRow + 54, null);                   // G54: 단가 합계
-        setCellValue(sheet, 8, startRow + 54, supplyAmt);              // H54: 공급가 합계
-        setCellValue(sheet, 9, startRow + 54, vatAmt);                 // I54: 부가세 합계
-        setCellValue(sheet, 10, startRow + 54, totalAmt);              // J54: 합계금액 합계
+        setCellValue(sheet, 1, startRow + 54, "소계");              // A54: "소계"
+        setCellValue(sheet, 6, startRow + 54, totalQuantity);       // F54: 전체 수량 합계 ✅
+        setCellValue(sheet, 7, startRow + 54, null);                // G54: 단가 합계 (공백)
+        setCellValue(sheet, 8, startRow + 54, supplyAmt);           // H54: 공급가 합계
+        setCellValue(sheet, 9, startRow + 54, vatAmt);              // I54: 부가세 합계
+        setCellValue(sheet, 10, startRow + 54, totalAmt);           // J54: 합계금액 합계
         
-        setCellValue(sheet, 3, startRow + 56, totalAmt);               // C56: 주문합계
-        setCellValue(sheet, 5, startRow + 56, todayCollection);        // E56: 당일수급
-        setCellValue(sheet, 7, startRow + 56, uncollectedBalance);     // G56: 미수금
+        setCellValue(sheet, 3, startRow + 56, totalAmt);            // C56: 주문합계
+        setCellValue(sheet, 5, startRow + 56, todayCollection);     // E56: 당일수급
+        setCellValue(sheet, 7, startRow + 56, uncollectedBalance);  // G56: 미수금
+    }
+
+    /**
+     * 전체 품목의 수량 합계 계산
+     */
+    private Integer calculateTotalQuantityFromItems(List<Object[]> allItems) {
+        if (allItems == null || allItems.isEmpty()) {
+            return 0;
+        }
+        
+        int totalQuantity = 0;
+        for (Object[] item : allItems) {
+            // item[4] = order_qty
+            Integer qty = ((Number) item[4]).intValue();
+            totalQuantity += qty;
+        }
+        
+        log.debug("전체 수량 합계 계산: {} (품목 {}개)", totalQuantity, allItems.size());
+        return totalQuantity;
     }
     
     /**

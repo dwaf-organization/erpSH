@@ -40,7 +40,7 @@ dependencies {
 	    // Apache POI for Excel
     implementation 'org.apache.poi:poi:5.2.4'
     implementation 'org.apache.poi:poi-ooxml:5.2.4'
-    implementation 'org.apache.poi:poi-ooxml-schemas:5.2.4'
+    //implementation 'org.apache.poi:poi-ooxml-schemas:5.2.4'
 }
 
 tasks.named('test') {
