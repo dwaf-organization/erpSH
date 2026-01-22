@@ -194,7 +194,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
            "(:orderAvailableYn = 2 AND c.customerCode NOT IN :limitedCustomerCodes) " + // 선택불가인 경우 제한 거래처 제외
            "ORDER BY c.customerCode ASC")
     List<Customer> findOrderableCustomersForItem(
-        @Param("itemCode") Integer itemCode,
+//        @Param("itemCode") Integer itemCode,
         @Param("orderAvailableYn") Integer orderAvailableYn,
         @Param("limitedCustomerCodes") List<Integer> limitedCustomerCodes
     );

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>거래명세표 엑셀 테스트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            font-family: monospace;
+            resize: vertical;
+            height: 80px;
+        }
+
+        .btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e2e3e5;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🏢 거래명세표 엑셀 테스트</h1>
+        
+        <form id="excelForm">
+            <div class="form-group">
+                <label for="orderNumbers">📝 주문번호 (줄바꿈으로 구분)</label>
+                <textarea id="orderNumbers" placeholder="20251212001&#10;20251212001">20251212001</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="hqCode">🏢 본사코드</label>
+                <input type="number" id="hqCode" value="2" min="1" required>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                📊 엑셀 다운로드
+            </button>
+        </form>
+
+        <div id="result" class="result"></div>
+
+        <div class="info">
+            <strong>📡 API 정보:</strong><br>
+            <strong>URL:</strong> http://localhost:8000/api/v1/erp/transaction-statement/excel<br>
+            <strong>Method:</strong> POST<br>
+            <strong>Content-Type:</strong> application/json
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('excelForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const result = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 로딩 상태로 변경
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="loading"><div class="spinner"></div>📥 생성 중...</div>';
+            
+            // 결과 초기화
+            result.style.display = 'none';
+
+            try {
+                // 입력값 가져오기
+                const orderNumbersText = document.getElementById('orderNumbers').value;
+                const hqCode = parseInt(document.getElementById('hqCode').value);
+
+                // 주문번호 배열 생성
+                const orderNumbers = orderNumbersText
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0);
+
+                if (orderNumbers.length === 0) {
+                    throw new Error('주문번호를 입력해주세요.');
+                }
+
+                const requestData = {
+                    orderNumbers: orderNumbers,
+                    hqCode: hqCode
+                };
+
+                console.log('📤 요청 데이터:', requestData);
+
+                // API 호출
+                const response = await fetch('http://localhost:8000/api/v1/erp/transaction-statement/excel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                console.log('📥 응답 상태:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch {
+                        errorData = { message: `서버 오류: ${response.status}` };
+                    }
+                    throw new Error(errorData.message || `HTTP ${response.status} 오류`);
+                }
+
+                // 파일 다운로드 처리
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // 파일명 생성
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+                const fileName = orderNumbers.length === 1
+                    ? `거래명세표_${orderNumbers[0]}_${timestamp}.xlsx`
+                    : `거래명세표_${orderNumbers.length}건_${timestamp}.zip`;
+                
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                // 성공 메시지
+                showResult(`✅ 엑셀 파일이 다운로드되었습니다: ${fileName}`, 'success');
+
+            } catch (error) {
+                console.error('❌ 오류 발생:', error);
+                
+                let errorMessage = '알 수 없는 오류가 발생했습니다.';
+                if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                showResult(`❌ ${errorMessage}`, 'error');
+
+            } finally {
+                // 버튼 원래 상태로 복원
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '📊 엑셀 다운로드';
+            }
+        });
+
+        function showResult(message, type) {
+            result.textContent = message;
+            result.className = `result ${type}`;
+            result.style.display = 'block';
+        }
+
+        // 페이지 로드 시 현재 시간 표시
+        console.log('🕐 페이지 로드 시간:', new Date().toLocaleString());
+        console.log('📍 테스트용 HTML 페이지가 준비되었습니다.');
+    </script>
+</body>
+</html>

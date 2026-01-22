@@ -35,6 +35,10 @@ spring:
     resources:
       static-locations: classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/
 
+management:
+  security:
+    enabled: false
+
 public-api:
   business-population:
     base-url: https://bigdata.sbiz.or.kr/sbiz/api/bizonSttus/dynpplSttus/search.json

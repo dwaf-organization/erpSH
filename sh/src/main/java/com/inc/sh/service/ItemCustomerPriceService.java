@@ -333,7 +333,7 @@ public class ItemCustomerPriceService {
                 limitedCustomerCodes = List.of(-1); // 빈 IN 절 방지
             }
             return customerRepository.findOrderableCustomersForItem(
-                    item.getItemCode(), 
+//                    item.getItemCode(), 
                     item.getOrderAvailableYn(), 
                     limitedCustomerCodes
             );

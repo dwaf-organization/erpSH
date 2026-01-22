@@ -972,7 +972,8 @@ public interface OrderRepository extends JpaRepository<Order, String> {
            "oi.order_unit_price, " +
            "oi.supply_amt, " +
            "oi.vat_amt, " +
-           "oi.total_amt " +
+           "oi.total_amt, " +
+           "oi.tax_target " +
            "FROM order_item oi " +
            "WHERE oi.order_no IN :orderNumbers " +
            "ORDER BY oi.order_no, oi.order_item_code", nativeQuery = true)
