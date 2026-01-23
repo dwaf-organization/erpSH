@@ -21,4 +21,12 @@ public class PageController {
         return "excel";
     }
     
+    /**
+     * 거래명세표 엑셀 테스트 페이지 (Thymeleaf)
+     * GET /excel-test → templates/excel-test.html
+     */
+    @GetMapping("/tax")
+    public String taxTestPage() {
+        return "tax";
+    }
 }

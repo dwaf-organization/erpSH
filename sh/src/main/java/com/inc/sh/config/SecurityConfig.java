@@ -28,6 +28,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Content-Disposition")); //이거 추가
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -41,6 +42,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -58,7 +60,7 @@ public class SecurityConfig {
                                 "/auth/**",          // 추가
                                 "/signup/**",        // 추가
                                 "/api/signup/**",    // 추가
-                                "/excel", "/", "/static/**", "/api/**",
+                                "/excel", "/tax", "/", "/static/**", "/api/**",
                                 "/api/**"            // 개발 테스트용 (임시)
                         ).permitAll()
                         .anyRequest().authenticated()

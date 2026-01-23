@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>전자세금계산서 엑셀 다운로드 테스트</title>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .required {
+            color: red;
+        }
+        .excel-required {
+            color: orange;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0,123,255,0.3);
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .button-group {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .excel-only {
+            background-color: #fff3e0;
+            border: 1px solid #ff9800;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .excel-only h3 {
+            margin-top: 0;
+            color: #f57c00;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧾 전자세금계산서 엑셀 다운로드 테스트</h1>
+        
+        <div class="info-box">
+            <h3>📋 사용법</h3>
+            <p>• <span class="required">빨간색(*)</span>은 모든 기능에서 필수 항목입니다.</p>
+            <p>• <span class="excel-required">주황색(※)</span>은 엑셀 다운로드에서만 필수 항목입니다.</p>
+            <p>• 거래처코드와 품목코드는 선택사항입니다 (비워두면 전체 조회).</p>
+            <p>• 품목코드는 쉼표로 구분하여 여러 개 입력 가능합니다 (예: 101,102,103).</p>
+        </div>
+
+        <form id="taxInvoiceForm">
+            <!-- 공통 필수 항목 -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="startDate">조회시작일자 <span class="required">*</span></label>
+                    <input type="date" id="startDate" name="startDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="endDate">조회종료일자 <span class="required">*</span></label>
+                    <input type="date" id="endDate" name="endDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="hqCode">본사코드 <span class="required">*</span></label>
+                    <input type="number" id="hqCode" name="hqCode" placeholder="예: 4" required>
+                </div>
+            </div>
+
+            <!-- 선택 항목 -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="customerCode">거래처코드 (선택)</label>
+                    <input type="number" id="customerCode" name="customerCode" placeholder="예: 1 (비워두면 전체 거래처)">
+                </div>
+                <div class="form-group">
+                    <label for="itemCodes">품목코드 (선택)</label>
+                    <input type="text" id="itemCodes" name="itemCodes" placeholder="예: 101,102,103 (쉼표로 구분, 비워두면 전체 품목)">
+                </div>
+            </div>
+
+            <!-- 엑셀 전용 항목 -->
+            <div class="excel-only">
+                <h3>📊 엑셀 다운로드 전용 항목</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taxType">세금계산서 구분 <span class="excel-required">※</span></label>
+                        <select id="taxType" name="taxType">
+                            <option value="">선택하세요 (엑셀 다운로드시 필수)</option>
+                            <option value="면세">면세</option>
+                            <option value="과세">과세</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="issueDate">작성일자 <span class="excel-required">※</span></label>
+                        <input type="date" id="issueDate" name="issueDate">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn btn-success" onclick="downloadExcel()">📥 엑셀 다운로드</button>
+                <button type="button" class="btn btn-secondary" onclick="testDataQuery()">🔍 데이터 조회 테스트 (프로그램용)</button>
+                <button type="reset" class="btn">🔄 초기화</button>
+            </div>
+        </form>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        // 오늘 날짜로 기본값 설정
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').value = getMonthStart();
+            document.getElementById('endDate').value = today;
+            document.getElementById('issueDate').value = today;
+            document.getElementById('hqCode').value = '2';
+        }
+        
+        // 이번 달 첫째 날 구하기
+        function getMonthStart() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        }
+        
+        // 공통 폼 데이터 가져오기
+        function getCommonFormData() {
+            const formData = new FormData(document.getElementById('taxInvoiceForm'));
+            
+            // 날짜를 YYYYMMDD 형식으로 변환
+            const startDate = formData.get('startDate').replace(/-/g, '');
+            const endDate = formData.get('endDate').replace(/-/g, '');
+            
+            // 품목코드 배열 처리
+            const itemCodesStr = formData.get('itemCodes');
+            let itemCodes = null;
+            if (itemCodesStr && itemCodesStr.trim()) {
+                itemCodes = itemCodesStr.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
+            }
+            
+            return {
+                startDate: startDate,
+                endDate: endDate,
+                hqCode: parseInt(formData.get('hqCode')),
+                customerCode: formData.get('customerCode') ? parseInt(formData.get('customerCode')) : null,
+                itemCodes: itemCodes
+            };
+        }
+        
+        // 엑셀용 폼 데이터 가져오기
+        function getExcelFormData() {
+            const commonData = getCommonFormData();
+            const formData = new FormData(document.getElementById('taxInvoiceForm'));
+            
+            const issueDate = formData.get('issueDate').replace(/-/g, '');
+            
+            return {
+                ...commonData,
+                taxType: formData.get('taxType'),
+                issueDate: issueDate
+            };
+        }
+        
+        // 엑셀 다운로드
+        function downloadExcel() {
+            try {
+                const data = getExcelFormData();
+                
+                // 필수값 검증
+                if (!data.startDate || !data.endDate || !data.hqCode) {
+                    showResult('error', '기본 필수 항목(조회기간, 본사코드)을 모두 입력해주세요.');
+                    return;
+                }
+                
+                if (!data.taxType || !data.issueDate) {
+                    showResult('error', '엑셀 다운로드를 위해 세금계산서 구분과 작성일자를 입력해주세요.');
+                    return;
+                }
+                
+                showResult('success', '엑셀 다운로드를 시작합니다...');
+                
+                // GET 방식으로 엑셀 다운로드
+                const params = new URLSearchParams();
+                params.append('startDate', data.startDate);
+                params.append('endDate', data.endDate);
+                params.append('hqCode', data.hqCode);
+                params.append('taxType', data.taxType);
+                params.append('issueDate', data.issueDate);
+                
+                if (data.customerCode) {
+                    params.append('customerCode', data.customerCode);
+                }
+                
+                if (data.itemCodes && data.itemCodes.length > 0) {
+                    data.itemCodes.forEach(code => params.append('itemCodes', code));
+                }
+                
+                const url = `/api/v1/erp/tax-invoice/excel?${params.toString()}`;
+                
+                // 새 창에서 다운로드
+                window.location.href = url;
+                
+                setTimeout(() => {
+                    showResult('success', '엑셀 다운로드가 시작되었습니다. 파일을 확인해주세요.');
+                }, 1000);
+                
+            } catch (error) {
+                showResult('error', '엑셀 다운로드 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+        
+        // 데이터 조회 테스트 (프로그램용 - taxType, issueDate 불필요)
+        async function testDataQuery() {
+            try {
+                const data = getCommonFormData();
+                
+                // 필수값 검증 (기본 항목만)
+                if (!data.startDate || !data.endDate || !data.hqCode) {
+                    showResult('error', '데이터 조회를 위해 기본 항목(조회기간, 본사코드)을 입력해주세요.');
+                    return;
+                }
+                
+                showResult('success', '데이터 조회 중...');
+                
+                // POST 방식으로 데이터 조회 (프로그램용 API)
+                const response = await fetch('/api/v1/erp/tax-invoice/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.code === 1) {
+                    showResult('success', `데이터 조회 성공! 조회된 거래처: ${result.data.length}개`);
+                } else {
+                    showResult('error', `데이터 조회 실패: ${result.message}`);
+                }
+                
+            } catch (error) {
+                showResult('error', '데이터 조회 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+        
+        // 결과 메시지 표시
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultDiv.style.display = 'block';
+            
+            // 5초 후 자동으로 숨김
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

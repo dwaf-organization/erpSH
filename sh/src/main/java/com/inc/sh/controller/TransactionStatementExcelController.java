@@ -67,7 +67,7 @@ public class TransactionStatementExcelController {
                 byte[] excelData = entry.getValue();
                 
                 String fileName = "거래명세표_" + orderNo + "_" + 
-                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")) + ".xlsx";
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd")) + ".xlsx";
                 
                 return ResponseEntity.ok()
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
